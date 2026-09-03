@@ -25,6 +25,7 @@ export type RecurringRule = {
   time: string;
   weekdays: number[]; // 0=Sun ... 6=Sat
   memo: string;
+  exceptions?: string[]; // 이 날짜들만 쉬는 반복 일정 (YYYY-MM-DD)
 };
 
 export type Notice = {

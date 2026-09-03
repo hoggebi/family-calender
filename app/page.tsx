@@ -472,6 +472,33 @@ export default function Home() {
     clearForm();
   }
 
+  async function skipRecurringOccurrence(ruleId: string, ds: string) {
+    const next = {
+      ...data,
+      recurring: data.recurring.map((r) =>
+        r.id === ruleId ? { ...r, exceptions: [...(r.exceptions ?? []), ds] } : r
+      ),
+    };
+    await persist(next);
+  }
+
+  async function deleteOneEvent(ev: DisplayEvent, ds: string) {
+    if (ev.isRecurring) {
+      await skipRecurringOccurrence(ev.id, ds);
+      if (editingRecurringId === ev.id) clearForm();
+      return;
+    }
+    const events = data.events.filter((e) => e.id !== ev.id);
+    const notices =
+      ev.isNotice && ev.noticeId
+        ? Object.fromEntries(
+            Object.entries(data.notices).map(([key, list]) => [key, list.filter((n) => n.id !== ev.noticeId)])
+          )
+        : data.notices;
+    await persist({ ...data, events, notices });
+    if (editingId === ev.id) clearForm();
+  }
+
   function toggleQWeekday(w: number) {
     setQWeekdays((prev) => (prev.includes(w) ? prev.filter((x) => x !== w) : [...prev, w].sort()));
   }
@@ -712,6 +739,10 @@ export default function Home() {
                   const recurringEvents = allDayEvents.filter((e) => e.isRecurring);
                   const dayEvents = allDayEvents.filter((e) => !e.isRecurring);
                   const shown = dayEvents.slice(0, 3);
+                  const colSpacer = bars.reduce(
+                    (max, bar, idx) => (ci >= bar.minCol && ci <= bar.maxCol ? Math.max(max, (idx + 1) * 16) : max),
+                    0
+                  );
 
                   return (
                     <div className={cls} key={ci} onClick={() => openDay(ds)}>
@@ -719,7 +750,7 @@ export default function Home() {
                         <div className="date-num">{cell.day}</div>
                         {holidayName && <div className="holiday-label">{holidayName}</div>}
                       </div>
-                      {spacerHeight > 0 && <div style={{ height: spacerHeight }} />}
+                      {colSpacer > 0 && <div style={{ height: colSpacer }} />}
                       {recurringEvents.map((ev) => {
                         const mem = memberById(data, ev.memberId);
                         return (
@@ -869,10 +900,19 @@ export default function Home() {
             <h2>{Number(activeDs.split('-')[1])}월 {Number(activeDs.split('-')[2])}일 일정{HOLIDAYS[activeDs] ? ` (${HOLIDAYS[activeDs]})` : ''}</h2>
             <div className="day-events-list">
               {(getEventsForDate(data, activeDs) as DisplayEvent[]).map((ev) => (
-                <div className="day-event-row" key={ev.id} onClick={() => handleRowClick(ev)}>
-                  <MemberBadge data={data} memberId={ev.memberId} isNotice={ev.isNotice} size={18} />
-                  <span className="txt">{ev.isNotice ? '📌 ' : ev.isRecurring ? '🔁 ' : ''}{ev.title}</span>
-                  <span className="time">{ev.time || ''}</span>
+                <div className="day-event-row" key={ev.id}>
+                  <div className="day-event-main" onClick={() => handleRowClick(ev)}>
+                    <MemberBadge data={data} memberId={ev.memberId} isNotice={ev.isNotice} size={18} />
+                    <span className="txt">{ev.isNotice ? '📌 ' : ev.isRecurring ? '🔁 ' : ''}{ev.title}</span>
+                    <span className="time">{ev.time || ''}</span>
+                  </div>
+                  <button
+                    className="del-btn"
+                    aria-label={ev.isRecurring ? '이 날짜만 쉬기' : '이 일정만 삭제'}
+                    onClick={(e) => { e.stopPropagation(); deleteOneEvent(ev, activeDs); }}
+                  >
+                    ×
+                  </button>
                 </div>
               ))}
             </div>

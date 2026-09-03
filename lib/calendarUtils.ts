@@ -26,7 +26,7 @@ export function getEventsForDate(data: CalendarData, ds: string) {
   const dow = new Date(ds + 'T00:00:00').getDay();
   const normal: (EventItem & { isRecurring?: boolean })[] = data.events.filter((e) => e.date === ds);
   const recurring = (data.recurring || [])
-    .filter((r) => r.weekdays.includes(dow))
+    .filter((r) => r.weekdays.includes(dow) && !(r.exceptions || []).includes(ds))
     .map((r) => ({
       id: r.id,
       date: ds,
