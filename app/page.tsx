@@ -70,6 +70,13 @@ function formatRange(start: string, end: string) {
   return `${sm}/${sd}~${em}/${ed}`;
 }
 
+// 시간을 기준으로 오전/오후 구분 (색으로 표시하기 위한 클래스명)
+function timeSlot(time: string): 'am' | 'pm' | '' {
+  if (!time) return '';
+  const h = Number(time.split(':')[0]);
+  return h < 12 ? 'am' : 'pm';
+}
+
 function MonthHighlights({
   data,
   y,
@@ -780,13 +787,13 @@ export default function Home() {
 
       <div className="grid">
         {weeks.map((week, wi) => {
-          const segments: Record<string, { minCol: number; maxCol: number; title: string; color: string; startDs: string }> = {};
+          const segments: Record<string, { minCol: number; maxCol: number; title: string; color: string; time: string; startDs: string }> = {};
           week.forEach((cell, col) => {
             if (!cell.ds) return;
             data.events.filter((e) => e.date === cell.ds && e.groupId).forEach((ev) => {
               const mems = membersOf(data, memberIdsOf(ev));
               if (!segments[ev.groupId as string]) {
-                segments[ev.groupId as string] = { minCol: col, maxCol: col, title: ev.title, color: multiColor(mems.map((mem) => mem.color)), startDs: cell.ds as string };
+                segments[ev.groupId as string] = { minCol: col, maxCol: col, title: ev.title, color: multiColor(mems.map((mem) => mem.color)), time: ev.time, startDs: cell.ds as string };
               } else {
                 segments[ev.groupId as string].maxCol = col;
               }
@@ -830,7 +837,7 @@ export default function Home() {
                         const mems = membersOf(data, memberIdsOf(ev));
                         return (
                           <div
-                            className="mini-bar"
+                            className={`mini-bar${timeSlot(ev.time) ? ' ' + timeSlot(ev.time) : ''}`}
                             key={ev.id}
                             style={{ background: multiColor(mems.map((mem) => mem.color)) }}
                             onClick={(e2) => { e2.stopPropagation(); openDay(ds, ev.id); }}
@@ -845,7 +852,7 @@ export default function Home() {
                         const prefix = ev.isNotice ? '📌 ' : '';
                         return (
                           <div
-                            className="note"
+                            className={`note${timeSlot(ev.time) ? ' ' + timeSlot(ev.time) : ''}`}
                             key={ev.id}
                             style={{ background: bg }}
                             onClick={(e2) => { e2.stopPropagation(); openDay(ds, ev.id); }}
@@ -863,7 +870,7 @@ export default function Home() {
                 <div className="week-bars" style={{ top: overlayTop, height: spacerHeight }}>
                   {bars.map((bar, idx) => (
                     <div
-                      className="range-bar"
+                      className={`range-bar${timeSlot(bar.time) ? ' ' + timeSlot(bar.time) : ''}`}
                       key={idx}
                       style={{
                         left: `calc(${(bar.minCol * 100) / 7}% + 2px)`,
@@ -975,7 +982,7 @@ export default function Home() {
             <h2>{Number(activeDs.split('-')[1])}월 {Number(activeDs.split('-')[2])}일 일정{HOLIDAYS[activeDs] ? ` (${HOLIDAYS[activeDs]})` : ''}</h2>
             <div className="day-events-list">
               {(getEventsForDate(data, activeDs) as DisplayEvent[]).map((ev) => (
-                <div className="day-event-row" key={ev.id}>
+                <div className={`day-event-row${timeSlot(ev.time) ? ' ' + timeSlot(ev.time) : ''}`} key={ev.id}>
                   <div className="day-event-main" onClick={() => handleRowClick(ev)}>
                     <MemberBadge data={data} memberIds={memberIdsOf(ev)} isNotice={ev.isNotice} size={18} />
                     <span className="txt">{ev.isNotice ? '📌 ' : ev.isRecurring ? '🔁 ' : ''}{ev.title}</span>

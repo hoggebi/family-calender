@@ -46,7 +46,7 @@ export type CalendarData = {
 
 // 구성원은 고정입니다 (호 할아버지 / 호 할머니 / 호 엄마)
 export const DEFAULT_MEMBERS: Member[] = [
-  { id: 'm_grandpa', name: '호 할아버지', color: '#5b7fa6', icon: '👨' },
+  { id: 'm_grandpa', name: '호 할아버지', color: '#4f9d6e', icon: '👨' },
   { id: 'm_grandma', name: '호 할머니', color: '#c97fa0', icon: '👩' },
   { id: 'm_mom', name: '호 엄마', color: '#e4674f', icon: '🤓' },
 ];

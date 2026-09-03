@@ -24,6 +24,10 @@
   --danger: #111111;
   --sun: #e0483f;
   --sat: #3a6ea5;
+  --am: #e8a33d;
+  --pm: #5b6bb5;
+  --am-bg: #fdf3e0;
+  --pm-bg: #eaedfa;
 }
 
 * { box-sizing: border-box; }

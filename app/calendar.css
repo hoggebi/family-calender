@@ -128,11 +128,15 @@ header { text-align: center; margin-bottom: 14px; }
 .holiday-label { font-size: 9px; color: var(--sun); font-weight: 500; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; width: 100%; text-align: center; }
 .note {
   font-size: 9px; font-weight: 500; line-height: 1.2; padding: 1.5px 4px; border-radius: 4px;
+  border-left: 3px solid transparent;
   color: white; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   min-width: 0; width: 100%;
 }
+.note.am, .mini-bar.am, .range-bar.am { border-left-color: var(--am); }
+.note.pm, .mini-bar.pm, .range-bar.pm { border-left-color: var(--pm); }
 .mini-bar {
   font-size: 9px; font-weight: 500; line-height: 1.2; padding: 1.5px 4px; border-radius: 4px;
+  border-left: 3px solid transparent;
   color: white; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   min-width: 0; width: 100%;
 }
@@ -141,6 +145,7 @@ header { text-align: center; margin-bottom: 14px; }
 .week-bars { position: absolute; left: 0; right: 0; pointer-events: none; }
 .range-bar {
   position: absolute; height: 15px; line-height: 15px; padding: 0 5px; border-radius: 5px;
+  border-left: 3px solid transparent;
   color: white; font-size: 9px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   box-shadow: 0 1px 2px rgba(0,0,0,0.18); cursor: pointer; pointer-events: auto; text-align: center;
 }
@@ -178,6 +183,8 @@ header { text-align: center; margin-bottom: 14px; }
 .day-events-list { display: flex; flex-direction: column; gap: 7px; margin-bottom: 14px; max-height: 240px; overflow-y: auto; }
 .group-edit-hint { font-size: 12px; color: var(--moss-dark); background: #eef2ee; border-radius: 8px; padding: 8px 10px; margin-bottom: 10px; line-height: 1.5; }
 .day-event-row { display: flex; align-items: center; gap: 4px; background: var(--paper-edge); border-radius: 8px; padding: 9px 10px; min-height: 40px; }
+.day-event-row.am { background: var(--am-bg); }
+.day-event-row.pm { background: var(--pm-bg); }
 .day-event-main { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; cursor: pointer; }
 .day-event-row .txt { flex: 1; font-size: 13px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .day-event-row .time { font-size: 11px; color: var(--ink-soft); flex-shrink: 0; }
