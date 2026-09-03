@@ -306,6 +306,7 @@ export default function Home() {
   const [fTime, setFTime] = useState('');
   const [fMemberIds, setFMemberIds] = useState<string[]>([]);
   const [fMemo, setFMemo] = useState('');
+  const [fStartDate, setFStartDate] = useState('');
   const [fEndDate, setFEndDate] = useState('');
   const [formStatus, setFormStatus] = useState<{ text: string; error?: boolean }>({ text: '' });
   const [formBusy, setFormBusy] = useState(false);
@@ -441,6 +442,7 @@ export default function Home() {
     setFTitle('');
     setFTime('');
     setFMemo('');
+    setFStartDate('');
     setFEndDate('');
     setFMemberIds(data.members[0] ? [data.members[0].id] : []);
     setFormStatus({ text: '' });
@@ -458,6 +460,14 @@ export default function Home() {
     setFTime(ev.time || '');
     setFMemberIds(memberIdsOf(ev));
     setFMemo(ev.memo || '');
+    if (ev.groupId) {
+      const groupDates = data.events.filter((e) => e.groupId === ev.groupId).map((e) => e.date).sort();
+      setFStartDate(groupDates[0]);
+      setFEndDate(groupDates[groupDates.length - 1]);
+    } else {
+      setFStartDate(ev.date);
+      setFEndDate('');
+    }
     setFormStatus({ text: '' });
   }
 
@@ -478,9 +488,30 @@ export default function Home() {
 
     let events = data.events;
     if (editingId) {
-      events = events.map((e) =>
-        e.id === editingId ? { ...e, title, time: fTime, memberId: fMemberIds[0] ?? null, memberIds: fMemberIds, memo: fMemo } : e
-      );
+      const target = data.events.find((e) => e.id === editingId);
+      const rangeStart = fStartDate || activeDs;
+      const rangeEnd = fEndDate && fEndDate > rangeStart ? fEndDate : rangeStart;
+      const others = target?.groupId
+        ? data.events.filter((e) => e.groupId !== target.groupId)
+        : data.events.filter((e) => e.id !== editingId);
+
+      if (rangeEnd > rangeStart) {
+        // 시작일~종료일 범위로 (재)구성 — 기존 그룹이면 그 그룹 유지, 아니면 새로 그룹화
+        const groupId = target?.groupId || 'g_' + Date.now();
+        const rebuilt: EventItem[] = [];
+        let dcur = new Date(rangeStart + 'T00:00:00');
+        const dend = new Date(rangeEnd + 'T00:00:00');
+        let count = 0;
+        while (dcur <= dend && count < 60) {
+          const ds = dateStr(dcur.getFullYear(), dcur.getMonth(), dcur.getDate());
+          rebuilt.push({ id: 'e_' + Date.now() + '_' + count, date: ds, title, time: fTime, memberId: fMemberIds[0] ?? null, memberIds: fMemberIds, memo: fMemo, groupId });
+          dcur.setDate(dcur.getDate() + 1);
+          count++;
+        }
+        events = [...others, ...rebuilt];
+      } else {
+        events = [...others, { id: editingId, date: rangeStart, title, time: fTime, memberId: fMemberIds[0] ?? null, memberIds: fMemberIds, memo: fMemo }];
+      }
     } else if (fEndDate && fEndDate > activeDs) {
       // 종료일이 시작일보다 뒤면 여러 날짜에 걸친 일정(이어진 막대)으로 저장
       const groupId = 'g_' + Date.now();
@@ -985,10 +1016,18 @@ export default function Home() {
                   <label>시간 (선택)</label>
                   <input type="time" value={fTime} onChange={(e) => setFTime(e.target.value)} />
                 </div>
-                {!editingId && (
+                {!editingId ? (
                   <div className="field">
                     <label>종료일 (선택 — 여러 날짜에 걸친 일정이면)</label>
                     <input type="date" min={activeDs || undefined} value={fEndDate} onChange={(e) => setFEndDate(e.target.value)} />
+                  </div>
+                ) : (
+                  <div className="field">
+                    <label>기간 (여러 날짜에 걸친 장기 일정으로 조정하려면 시작일·종료일을 바꾸세요)</label>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <input type="date" value={fStartDate} onChange={(e) => setFStartDate(e.target.value)} />
+                      <input type="date" value={fEndDate} min={fStartDate || undefined} onChange={(e) => setFEndDate(e.target.value)} />
+                    </div>
                   </div>
                 )}
                 <div className="field">
