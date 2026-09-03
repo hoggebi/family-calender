@@ -10,7 +10,8 @@ export type EventItem = {
   date: string; // YYYY-MM-DD
   title: string;
   time: string; // "HH:MM" or ""
-  memberId: string | null;
+  memberId: string | null; // 이전 데이터 호환용 — 새 데이터는 memberIds 사용
+  memberIds?: string[];
   memo: string;
   groupId?: string;
   isNotice?: boolean;
@@ -19,7 +20,8 @@ export type EventItem = {
 
 export type RecurringRule = {
   id: string;
-  memberId: string | null;
+  memberId: string | null; // 이전 데이터 호환용 — 새 데이터는 memberIds 사용
+  memberIds?: string[];
   personLabel: string;
   title: string;
   time: string;

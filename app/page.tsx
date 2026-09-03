@@ -8,7 +8,9 @@ import {
   dateStr,
   todayStr,
   monthKey as makeMonthKey,
-  memberById,
+  memberIdsOf,
+  membersOf,
+  multiColor,
   getEventsForDate,
   buildWeeks,
 } from '@/lib/calendarUtils';
@@ -19,15 +21,44 @@ function escapeHtml(s: string) {
   return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
 }
 
-function MemberBadge({ data, memberId, isNotice, isRecurring, size = 18 }: { data: CalendarData; memberId: string | null; isNotice?: boolean; isRecurring?: boolean; size?: number }) {
-  const mem = memberById(data, memberId);
+function MemberBadge({ data, memberIds, isNotice, size = 18 }: { data: CalendarData; memberIds: string[]; isNotice?: boolean; size?: number }) {
   if (isNotice) {
     return <span className="icon-badge" style={{ background: '#111111', width: size, height: size, fontSize: Math.round(size * 0.62) }}>📌</span>;
   }
-  if (mem?.icon) {
-    return <span className="icon-badge" style={{ background: mem.color, width: size, height: size, fontSize: Math.round(size * 0.62) }}>{mem.icon}</span>;
+  const mems = membersOf(data, memberIds);
+  if (mems.length === 0) {
+    return <span className="dot" style={{ background: '#999' }} />;
   }
-  return <span className="dot" style={{ background: mem ? mem.color : '#999' }} />;
+  if (mems.length === 1) {
+    const mem = mems[0];
+    return mem.icon ? (
+      <span className="icon-badge" style={{ background: mem.color, width: size, height: size, fontSize: Math.round(size * 0.62) }}>{mem.icon}</span>
+    ) : (
+      <span className="dot" style={{ background: mem.color }} />
+    );
+  }
+  return (
+    <span className="badge-group">
+      {mems.map((mem, i) => (
+        <span
+          key={mem.id}
+          className="icon-badge"
+          style={{
+            background: mem.color,
+            width: size,
+            height: size,
+            fontSize: Math.round(size * 0.62),
+            marginLeft: i === 0 ? 0 : -Math.round(size * 0.32),
+            border: '1.5px solid var(--paper)',
+            boxSizing: 'border-box',
+            zIndex: mems.length - i,
+          }}
+        >
+          {mem.icon}
+        </span>
+      ))}
+    </span>
+  );
 }
 
 const DAY_NAMES = ['일', '월', '화', '수', '목', '금', '토'];
@@ -55,13 +86,13 @@ function MonthHighlights({
   const monthStart = dateStr(y, m, 1);
   const monthEnd = dateStr(y, m, new Date(y, m + 1, 0).getDate());
 
-  const groups = new Map<string, { dates: string[]; title: string; memberId: string | null }>();
+  const groups = new Map<string, { dates: string[]; title: string; memberIds: string[] }>();
   data.events
     .filter((e) => e.groupId)
     .forEach((e) => {
       const g = groups.get(e.groupId as string);
       if (g) g.dates.push(e.date);
-      else groups.set(e.groupId as string, { dates: [e.date], title: e.title, memberId: e.memberId });
+      else groups.set(e.groupId as string, { dates: [e.date], title: e.title, memberIds: memberIdsOf(e) });
     });
   const ranges = [...groups.values()]
     .map((g) => {
@@ -76,30 +107,30 @@ function MonthHighlights({
   return (
     <div className="highlights">
       {ranges.map((r) => {
-        const mem = memberById(data, r.memberId);
+        const mems = membersOf(data, r.memberIds);
         return (
           <div
             className="highlight-bar"
             key={r.start + r.title}
-            style={{ background: mem ? mem.color : '#999' }}
+            style={{ background: multiColor(mems.map((mem) => mem.color)) }}
             onClick={() => onOpenRange(r.start)}
           >
-            <span className="hi-badge">{mem?.icon ?? '📌'}</span>
+            {mems.length ? mems.map((mem) => <span className="hi-badge" key={mem.id}>{mem.icon}</span>) : <span className="hi-badge">📌</span>}
             <span className="hi-text">{formatRange(r.start, r.end)} {r.title}</span>
           </div>
         );
       })}
       {data.recurring.map((r) => {
-        const mem = memberById(data, r.memberId);
+        const mems = membersOf(data, memberIdsOf(r));
         const days = [...r.weekdays].sort().map((w) => DAY_NAMES[w]).join(',');
         return (
           <div
             className="highlight-bar"
             key={r.id}
-            style={{ background: mem ? mem.color : '#999' }}
+            style={{ background: multiColor(mems.map((mem) => mem.color)) }}
             onClick={() => onOpenRecurring(r)}
           >
-            <span className="hi-badge">{mem?.icon ?? '🔁'}</span>
+            {mems.length ? mems.map((mem) => <span className="hi-badge" key={mem.id}>{mem.icon}</span>) : <span className="hi-badge">🔁</span>}
             <span className="hi-text">🔁 매주 {days} {r.title}</span>
           </div>
         );
@@ -115,6 +146,7 @@ type ListEntry = {
   title: string;
   time: string;
   memberId: string | null;
+  memberIds?: string[];
   isNotice?: boolean;
   memo: string;
   evId: string;
@@ -135,11 +167,12 @@ function buildListEntries(data: CalendarData): ListEntry[] {
         title: e.title,
         time: e.time,
         memberId: e.memberId,
+        memberIds: e.memberIds,
         memo: e.memo,
         evId: e.id,
       });
     } else {
-      entries.push({ sortKey: e.date, date: e.date, title: e.title, time: e.time, memberId: e.memberId, isNotice: e.isNotice, memo: e.memo, evId: e.id });
+      entries.push({ sortKey: e.date, date: e.date, title: e.title, time: e.time, memberId: e.memberId, memberIds: e.memberIds, isNotice: e.isNotice, memo: e.memo, evId: e.id });
     }
   });
   return entries.sort((a, b) => a.sortKey.localeCompare(b.sortKey) || (a.time || '99').localeCompare(b.time || '99'));
@@ -160,16 +193,16 @@ function ListView({
   const recList = data.recurring
     .filter((r) => {
       if (!q) return true;
-      const mem = memberById(data, r.memberId);
+      const names = membersOf(data, memberIdsOf(r)).map((mem) => mem.name).join(' ');
       const days = [...r.weekdays].sort().map((w) => DAY_NAMES[w]).join(',');
-      const text = `${r.title} ${mem?.name ?? ''} 매주 ${days} ${r.time} ${r.memo}`.toLowerCase();
+      const text = `${r.title} ${names} 매주 ${days} ${r.time} ${r.memo}`.toLowerCase();
       return text.includes(q);
     })
     .sort((a, b) => (a.time || '99').localeCompare(b.time || '99'));
 
   const entries = buildListEntries(data).filter((en) => {
     if (!q) return true;
-    const mem = memberById(data, en.memberId);
+    const names = membersOf(data, memberIdsOf(en)).map((mem) => mem.name).join(' ');
     const [, em, ed] = en.date.split('-').map(Number);
     const dow = DAY_NAMES[new Date(en.date + 'T00:00:00').getDay()];
     const dateForms = [en.date, `${em}/${ed}`, `${em}월 ${ed}일`, `${ed}일`, `${dow}요일`];
@@ -177,7 +210,7 @@ function ListView({
       const [, eem, eed] = en.endDate.split('-').map(Number);
       dateForms.push(en.endDate, `${eem}/${eed}`, `${eem}월 ${eed}일`);
     }
-    const text = `${en.title} ${mem?.name ?? ''} ${en.time} ${en.memo} ${dateForms.join(' ')}`.toLowerCase();
+    const text = `${en.title} ${names} ${en.time} ${en.memo} ${dateForms.join(' ')}`.toLowerCase();
     return text.includes(q);
   });
 
@@ -214,7 +247,7 @@ function ListView({
                 const days = [...r.weekdays].sort().map((w) => DAY_NAMES[w]).join(',');
                 return (
                   <div className="month-list-row" key={r.id} onClick={() => onEditRecurring(r)}>
-                    <MemberBadge data={data} memberId={r.memberId} size={20} />
+                    <MemberBadge data={data} memberIds={memberIdsOf(r)} size={20} />
                     <span className="month-list-txt">매주 {days} {r.title}</span>
                     <span className="month-list-time">{r.time}</span>
                   </div>
@@ -238,7 +271,7 @@ function ListView({
                         <><b>{d}</b>일({dow})</>
                       )}
                     </span>
-                    <MemberBadge data={data} memberId={en.memberId} isNotice={en.isNotice} size={18} />
+                    <MemberBadge data={data} memberIds={memberIdsOf(en)} isNotice={en.isNotice} size={18} />
                     <span className="month-list-txt">{en.isNotice ? '📌 ' : ''}{en.title}</span>
                     <span className="month-list-time">{en.time}</span>
                   </div>
@@ -271,7 +304,7 @@ export default function Home() {
   const [editingRecurringId, setEditingRecurringId] = useState<string | null>(null);
   const [fTitle, setFTitle] = useState('');
   const [fTime, setFTime] = useState('');
-  const [fMemberId, setFMemberId] = useState<string | null>(null);
+  const [fMemberIds, setFMemberIds] = useState<string[]>([]);
   const [fMemo, setFMemo] = useState('');
   const [fEndDate, setFEndDate] = useState('');
   const [formStatus, setFormStatus] = useState<{ text: string; error?: boolean }>({ text: '' });
@@ -279,7 +312,7 @@ export default function Home() {
 
   // 빠른 일정 입력 (AI 없이 직접 선택)
   const [qType, setQType] = useState<'once' | 'range' | 'weekly'>('once');
-  const [qMemberId, setQMemberId] = useState<string | null>(null);
+  const [qMemberIds, setQMemberIds] = useState<string[]>([]);
   const [qTitle, setQTitle] = useState('');
   const [qTime, setQTime] = useState('');
   const [qMemo, setQMemo] = useState('');
@@ -333,8 +366,16 @@ export default function Home() {
   }, [loadData]);
 
   useEffect(() => {
-    if (!qMemberId && data.members.length) setQMemberId(data.members[0].id);
-  }, [data.members, qMemberId]);
+    if (qMemberIds.length === 0 && data.members.length) setQMemberIds([data.members[0].id]);
+  }, [data.members, qMemberIds]);
+
+  function toggleQMember(id: string) {
+    setQMemberIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+
+  function toggleFMember(id: string) {
+    setFMemberIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
 
   async function persist(next: CalendarData): Promise<boolean> {
     setData(next);
@@ -401,7 +442,7 @@ export default function Home() {
     setFTime('');
     setFMemo('');
     setFEndDate('');
-    setFMemberId(data.members[0]?.id ?? null);
+    setFMemberIds(data.members[0] ? [data.members[0].id] : []);
     setFormStatus({ text: '' });
   }
 
@@ -415,7 +456,7 @@ export default function Home() {
     setEditingId(ev.id);
     setFTitle(ev.title);
     setFTime(ev.time || '');
-    setFMemberId(ev.memberId);
+    setFMemberIds(memberIdsOf(ev));
     setFMemo(ev.memo || '');
     setFormStatus({ text: '' });
   }
@@ -437,7 +478,9 @@ export default function Home() {
 
     let events = data.events;
     if (editingId) {
-      events = events.map((e) => (e.id === editingId ? { ...e, title, time: fTime, memberId: fMemberId, memo: fMemo } : e));
+      events = events.map((e) =>
+        e.id === editingId ? { ...e, title, time: fTime, memberId: fMemberIds[0] ?? null, memberIds: fMemberIds, memo: fMemo } : e
+      );
     } else if (fEndDate && fEndDate > activeDs) {
       // 종료일이 시작일보다 뒤면 여러 날짜에 걸친 일정(이어진 막대)으로 저장
       const groupId = 'g_' + Date.now();
@@ -447,13 +490,13 @@ export default function Home() {
       let count = 0;
       while (dcur <= dend && count < 60) {
         const ds = dateStr(dcur.getFullYear(), dcur.getMonth(), dcur.getDate());
-        next.push({ id: 'e_' + Date.now() + '_' + count, date: ds, title, time: fTime, memberId: fMemberId, memo: fMemo, groupId });
+        next.push({ id: 'e_' + Date.now() + '_' + count, date: ds, title, time: fTime, memberId: fMemberIds[0] ?? null, memberIds: fMemberIds, memo: fMemo, groupId });
         dcur.setDate(dcur.getDate() + 1);
         count++;
       }
       events = next;
     } else {
-      events = [...events, { id: 'e_' + Date.now(), date: activeDs, title, time: fTime, memberId: fMemberId, memo: fMemo }];
+      events = [...events, { id: 'e_' + Date.now(), date: activeDs, title, time: fTime, memberId: fMemberIds[0] ?? null, memberIds: fMemberIds, memo: fMemo }];
     }
     const ok = await persist({ ...data, events });
     setFormBusy(false);
@@ -519,11 +562,12 @@ export default function Home() {
       setQuickStatus({ text: '제목을 입력해주세요.', error: true });
       return;
     }
-    if (!qMemberId) {
+    if (!qMemberIds.length) {
       setQuickStatus({ text: '담당자를 선택해주세요.', error: true });
       return;
     }
     let next: CalendarData = data;
+    const names = membersOf(data, qMemberIds).map((mem) => mem.name).join('/');
 
     if (qType === 'weekly') {
       if (!qWeekdays.length) {
@@ -534,7 +578,7 @@ export default function Home() {
         ...data,
         recurring: [
           ...data.recurring,
-          { id: 'r_' + Date.now(), memberId: qMemberId, personLabel: memberById(data, qMemberId)?.name || '', title, time: qTime, weekdays: qWeekdays, memo: qMemo },
+          { id: 'r_' + Date.now(), memberId: qMemberIds[0] ?? null, memberIds: qMemberIds, personLabel: names, title, time: qTime, weekdays: qWeekdays, memo: qMemo },
         ],
       };
     } else if (qType === 'range') {
@@ -553,7 +597,7 @@ export default function Home() {
       let count = 0;
       while (dcur <= dend && count < 60) {
         const ds = dateStr(dcur.getFullYear(), dcur.getMonth(), dcur.getDate());
-        events.push({ id: 'e_' + Date.now() + '_' + count, date: ds, title, time: qTime, memberId: qMemberId, memo: qMemo, groupId });
+        events.push({ id: 'e_' + Date.now() + '_' + count, date: ds, title, time: qTime, memberId: qMemberIds[0] ?? null, memberIds: qMemberIds, memo: qMemo, groupId });
         dcur.setDate(dcur.getDate() + 1);
         count++;
       }
@@ -563,7 +607,7 @@ export default function Home() {
         setQuickStatus({ text: '날짜를 선택해주세요.', error: true });
         return;
       }
-      next = { ...data, events: [...data.events, { id: 'e_' + Date.now(), date: qDate, title, time: qTime, memberId: qMemberId, memo: qMemo }] };
+      next = { ...data, events: [...data.events, { id: 'e_' + Date.now(), date: qDate, title, time: qTime, memberId: qMemberIds[0] ?? null, memberIds: qMemberIds, memo: qMemo }] };
     }
 
     setQuickStatus({ text: '저장 중…' });
@@ -627,7 +671,7 @@ export default function Home() {
       <div className="family-strip">
         {data.members.map((mem) => (
           <div className="chip" key={mem.id}>
-            <MemberBadge data={data} memberId={mem.id} size={26} />
+            <MemberBadge data={data} memberIds={[mem.id]} size={26} />
             <span>{mem.name}</span>
           </div>
         ))}
@@ -709,9 +753,9 @@ export default function Home() {
           week.forEach((cell, col) => {
             if (!cell.ds) return;
             data.events.filter((e) => e.date === cell.ds && e.groupId).forEach((ev) => {
-              const mem = memberById(data, ev.memberId);
+              const mems = membersOf(data, memberIdsOf(ev));
               if (!segments[ev.groupId as string]) {
-                segments[ev.groupId as string] = { minCol: col, maxCol: col, title: ev.title, color: mem ? mem.color : '#999', startDs: cell.ds as string };
+                segments[ev.groupId as string] = { minCol: col, maxCol: col, title: ev.title, color: multiColor(mems.map((mem) => mem.color)), startDs: cell.ds as string };
               } else {
                 segments[ev.groupId as string].maxCol = col;
               }
@@ -752,12 +796,12 @@ export default function Home() {
                       </div>
                       {colSpacer > 0 && <div style={{ height: colSpacer }} />}
                       {recurringEvents.map((ev) => {
-                        const mem = memberById(data, ev.memberId);
+                        const mems = membersOf(data, memberIdsOf(ev));
                         return (
                           <div
                             className="mini-bar"
                             key={ev.id}
-                            style={{ background: mem ? mem.color : '#999' }}
+                            style={{ background: multiColor(mems.map((mem) => mem.color)) }}
                             onClick={(e2) => { e2.stopPropagation(); openDay(ds, ev.id); }}
                           >
                             {ev.title}
@@ -765,8 +809,8 @@ export default function Home() {
                         );
                       })}
                       {shown.map((ev) => {
-                        const mem = memberById(data, ev.memberId);
-                        const bg = ev.isNotice ? '#111111' : mem ? mem.color : '#999';
+                        const mems = membersOf(data, memberIdsOf(ev));
+                        const bg = ev.isNotice ? '#111111' : multiColor(mems.map((mem) => mem.color));
                         const prefix = ev.isNotice ? '📌 ' : '';
                         return (
                           <div
@@ -817,11 +861,11 @@ export default function Home() {
         <label className="quick-add-label">✏️ 일정 빠르게 추가</label>
 
         <div className="field">
-          <label>담당자</label>
+          <label>담당자 (여러 명 선택 가능)</label>
           <div className="member-pick">
             {data.members.map((mem) => (
-              <div key={mem.id} className={`chip${qMemberId === mem.id ? ' selected' : ''}`} onClick={() => setQMemberId(mem.id)}>
-                <MemberBadge data={data} memberId={mem.id} size={20} />
+              <div key={mem.id} className={`chip${qMemberIds.includes(mem.id) ? ' selected' : ''}`} onClick={() => toggleQMember(mem.id)}>
+                <MemberBadge data={data} memberIds={[mem.id]} size={20} />
                 <span>{mem.name}</span>
               </div>
             ))}
@@ -902,7 +946,7 @@ export default function Home() {
               {(getEventsForDate(data, activeDs) as DisplayEvent[]).map((ev) => (
                 <div className="day-event-row" key={ev.id}>
                   <div className="day-event-main" onClick={() => handleRowClick(ev)}>
-                    <MemberBadge data={data} memberId={ev.memberId} isNotice={ev.isNotice} size={18} />
+                    <MemberBadge data={data} memberIds={memberIdsOf(ev)} isNotice={ev.isNotice} size={18} />
                     <span className="txt">{ev.isNotice ? '📌 ' : ev.isRecurring ? '🔁 ' : ''}{ev.title}</span>
                     <span className="time">{ev.time || ''}</span>
                   </div>
@@ -920,13 +964,13 @@ export default function Home() {
               (() => {
                 const rec = data.recurring.find((r) => r.id === editingRecurringId);
                 if (!rec) return null;
-                const mem = memberById(data, rec.memberId);
+                const names = membersOf(data, memberIdsOf(rec)).map((mem) => mem.name).join('/');
                 const days = [...rec.weekdays].sort().map((w) => DAY_NAMES[w]).join(',');
                 return (
                   <div className="group-edit-hint">
                     🔁 반복 일정은 요일·제목 수정은 지원하지 않아요. 바꾸려면 삭제 후 다시 등록해주세요.
                     <div style={{ marginTop: 6, fontWeight: 700 }}>
-                      {rec.personLabel || mem?.name || '미지정'} · 매주 {days}{rec.time ? ' ' + rec.time : ''} {rec.title}
+                      {rec.personLabel || names || '미지정'} · 매주 {days}{rec.time ? ' ' + rec.time : ''} {rec.title}
                     </div>
                   </div>
                 );
@@ -948,15 +992,15 @@ export default function Home() {
                   </div>
                 )}
                 <div className="field">
-                  <label>누구 일정인가요?</label>
+                  <label>누구 일정인가요? (여러 명 선택 가능)</label>
                   <div className="member-pick">
                     {data.members.map((mem) => (
                       <div
                         key={mem.id}
-                        className={`chip${fMemberId === mem.id ? ' selected' : ''}`}
-                        onClick={() => setFMemberId(mem.id)}
+                        className={`chip${fMemberIds.includes(mem.id) ? ' selected' : ''}`}
+                        onClick={() => toggleFMember(mem.id)}
                       >
-                        <MemberBadge data={data} memberId={mem.id} size={20} />
+                        <MemberBadge data={data} memberIds={[mem.id]} size={20} />
                         <span>{mem.name}</span>
                       </div>
                     ))}

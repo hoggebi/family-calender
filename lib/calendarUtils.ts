@@ -8,9 +8,22 @@ export const todayStr = () => {
 };
 export const monthKey = (y: number, m: number) => `${y}-${pad(m + 1)}`;
 
-export function memberById(data: CalendarData, id: string | null): Member | undefined {
-  if (!id) return undefined;
-  return data.members.find((m) => m.id === id);
+// memberIds가 있으면 그걸, 없으면(옛날 데이터) memberId 하나짜리 배열로
+export function memberIdsOf(entity: { memberId: string | null; memberIds?: string[] }): string[] {
+  if (entity.memberIds && entity.memberIds.length) return entity.memberIds;
+  return entity.memberId ? [entity.memberId] : [];
+}
+
+export function membersOf(data: CalendarData, ids: string[]): Member[] {
+  return ids.map((id) => data.members.find((m) => m.id === id)).filter((m): m is Member => Boolean(m));
+}
+
+// 담당자가 여러 명이면 색을 균등하게 나눠 표시
+export function multiColor(colors: string[]): string {
+  if (colors.length === 0) return '#999';
+  if (colors.length === 1) return colors[0];
+  const step = 100 / colors.length;
+  return `linear-gradient(90deg, ${colors.map((c, i) => `${c} ${i * step}%, ${c} ${(i + 1) * step}%`).join(', ')})`;
 }
 
 export function findMemberByLabel(data: CalendarData, label: string): string | null {
@@ -33,6 +46,7 @@ export function getEventsForDate(data: CalendarData, ds: string) {
       title: r.title,
       time: r.time,
       memberId: r.memberId,
+      memberIds: r.memberIds,
       memo: r.memo,
       isRecurring: true as const,
     }));
