@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@latest/dist/web/variable/pretendardvariable.css');
+
+:root {
+  --board-bg: #ffffff;
+  --board-bg-2: #f2f2f2;
+  --paper: #ffffff;
+  --paper-edge: #f2f2f2;
+  --ink: #111111;
+  --ink-soft: #6b6b6b;
+  --moss: #111111;
+  --moss-dark: #000000;
+  --line: #dddddd;
+  --shadow: rgba(0, 0, 0, 0.12);
+  --danger: #111111;
+  --sun: #e0483f;
+  --sat: #3a6ea5;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  font-family: 'Pretendard Variable', Pretendard, -apple-system, sans-serif;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at 20% 10%, var(--board-bg-2), transparent 60%),
+    linear-gradient(180deg, var(--board-bg), var(--board-bg-2));
+  min-height: 100vh;
+  -webkit-text-size-adjust: 100%;
+}
+
+button {
+  font-family: inherit;
+}
