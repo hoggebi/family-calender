@@ -420,18 +420,34 @@ export default function Home() {
                   else if (dow === 0) cls += ' sun';
                   else if (dow === 6) cls += ' sat';
 
-                  const dayEvents = (getEventsForDate(data, ds) as DisplayEvent[]).filter((e) => !e.groupId);
+                  const allDayEvents = (getEventsForDate(data, ds) as DisplayEvent[]).filter((e) => !e.groupId);
+                  const recurringEvents = allDayEvents.filter((e) => e.isRecurring);
+                  const dayEvents = allDayEvents.filter((e) => !e.isRecurring);
                   const shown = dayEvents.slice(0, 3);
 
                   return (
                     <div className={cls} key={ci} onClick={() => openDay(ds)}>
                       <div className="date-num">{cell.day}</div>
+                      {recurringEvents.map((ev) => {
+                        const mem = memberById(data, ev.memberId);
+                        return (
+                          <div
+                            className="recur-line"
+                            key={ev.id}
+                            style={{ color: mem ? mem.color : '#777' }}
+                            onClick={(e2) => { e2.stopPropagation(); openDay(ds, ev.id); }}
+                          >
+                            <span className="recur-icon" aria-hidden>🔁</span>
+                            <span className="recur-title">{ev.title}</span>
+                          </div>
+                        );
+                      })}
                       {holidayName && <div className="holiday-label">{holidayName}</div>}
                       {spacerHeight > 0 && <div style={{ height: spacerHeight }} />}
                       {shown.map((ev) => {
                         const mem = memberById(data, ev.memberId);
                         const bg = ev.isNotice ? '#111111' : mem ? mem.color : '#999';
-                        const prefix = ev.isNotice ? '📌 ' : ev.isRecurring ? '🔁 ' : '';
+                        const prefix = ev.isNotice ? '📌 ' : '';
                         return (
                           <div
                             className="note"

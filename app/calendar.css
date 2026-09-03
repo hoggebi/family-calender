@@ -63,13 +63,14 @@ header { text-align: center; margin-bottom: 14px; }
 .legend span { margin: 0 5px; }
 
 .grid { display: flex; flex-direction: column; gap: 3px; }
-.weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; margin-bottom: 6px; text-align: center; font-size: 12px; font-weight: 700; color: var(--moss-dark); }
+.weekdays { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; margin-bottom: 6px; text-align: center; font-size: 12px; font-weight: 700; color: var(--moss-dark); }
 .week-wrap { position: relative; }
-.week-cells { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+.week-cells { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; }
 .cell {
   background: var(--paper); border: 1px solid var(--line); border-radius: 7px;
   min-height: 56px; padding: 3px; position: relative; cursor: pointer;
   display: flex; flex-direction: column; gap: 2px; box-shadow: 0 1px 0 var(--shadow);
+  min-width: 0; overflow: hidden;
 }
 .cell.empty { background: transparent; border: none; box-shadow: none; cursor: default; }
 .cell.today { outline: 2px solid var(--moss); outline-offset: -2px; }
@@ -80,14 +81,22 @@ header { text-align: center; margin-bottom: 14px; }
 .cell.holiday { background: #fdf1ef; }
 .holiday-label { font-size: 9px; color: var(--sun); font-weight: 700; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .note {
-  font-size: 10px; font-weight: 600; line-height: 1.15; padding: 2px 4px; border-radius: 3px;
+  font-size: 10px; font-weight: 600; line-height: 1.15; padding: 2px 4px; border-radius: 0;
   color: white; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .more-tag { font-size: 9px; color: var(--ink-soft); padding-left: 3px; }
 
+.recur-line {
+  display: flex; align-items: center; gap: 2px;
+  font-size: 9px; font-weight: 600; line-height: 1.3;
+  cursor: pointer; min-width: 0; max-width: 100%;
+}
+.recur-icon { font-size: 8px; flex-shrink: 0; line-height: 1; }
+.recur-title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
 .week-bars { position: absolute; left: 0; right: 0; pointer-events: none; }
 .range-bar {
-  position: absolute; height: 14px; line-height: 14px; padding: 0 5px; border-radius: 7px;
+  position: absolute; height: 14px; line-height: 14px; padding: 0 5px; border-radius: 0;
   color: white; font-size: 9.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   box-shadow: 0 1px 2px rgba(0,0,0,0.18); cursor: pointer; pointer-events: auto;
 }
