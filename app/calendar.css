@@ -113,24 +113,24 @@ header { text-align: center; margin-bottom: 14px; }
 .week-cells { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 1px; background: var(--line); }
 .cell {
   background: var(--paper); border: none; border-radius: 0;
-  min-height: 96px; padding: 3px 2px 2px; position: relative; cursor: pointer;
+  min-height: 96px; padding: 1px 2px 2px; position: relative; cursor: pointer;
   display: flex; flex-direction: column; gap: 1px; box-shadow: none;
   min-width: 0; overflow: hidden;
 }
 .cell.empty { background: var(--paper-edge); border: none; box-shadow: none; cursor: default; }
 .cell.today { outline: 2px solid var(--moss); outline-offset: -2px; z-index: 1; }
-.cell-head { height: 30px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; width: 100%; }
-.date-num { font-size: 13px; font-weight: 400; color: var(--ink); text-align: center; width: 100%; }
+.cell-head { height: auto; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 0; width: 100%; margin-bottom: 1px; }
+.date-num { font-size: 11px; font-weight: 400; color: var(--ink); text-align: center; width: 100%; line-height: 1.2; }
 .cell.today .date-num { color: var(--moss-dark); font-weight: 500; }
 .cell.sun .date-num, .cell.holiday .date-num { color: var(--sun); }
 .cell.sat .date-num { color: var(--sat); }
-.cell.holiday { background: #fdf1ef; }
+
 .holiday-label { font-size: 9px; color: var(--sun); font-weight: 500; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; width: 100%; text-align: center; }
 .note {
   font-size: 9px; font-weight: 500; line-height: 1.2; padding: 1.5px 4px 3.5px; border-radius: 4px;
   border-bottom: 3px solid transparent;
   color: white; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  min-width: 0; width: 100%;
+  min-width: 0; width: 100%; text-align: center;
 }
 .note.am, .mini-bar.am, .range-bar.am { border-bottom-color: var(--am); }
 .note.pm, .mini-bar.pm, .range-bar.pm { border-bottom-color: var(--pm); }
@@ -138,7 +138,7 @@ header { text-align: center; margin-bottom: 14px; }
   font-size: 9px; font-weight: 500; line-height: 1.2; padding: 1.5px 4px 3.5px; border-radius: 4px;
   border-bottom: 3px solid transparent;
   color: white; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  min-width: 0; width: 100%;
+  min-width: 0; width: 100%; text-align: center;
 }
 .more-tag { font-size: 9px; color: var(--ink-soft); padding-left: 3px; }
 
