@@ -740,7 +740,18 @@ export default function Home() {
         </button>
       ) : (
         <div className="notice-box">
-          <div className="notice-label">📌 {m + 1}월 주요 공지사항</div>
+          <div className="notice-head">
+            <div className="notice-label">📌 {m + 1}월 주요 공지사항</div>
+            {noticeList.length === 0 && (
+              <button
+                className="notice-close"
+                aria-label="공지사항 입력 닫기"
+                onClick={() => { setNoticeOpen(false); setNoticeText(''); setNoticeDate(''); setNoticeStatus({ text: '' }); }}
+              >
+                ×
+              </button>
+            )}
+          </div>
           {noticeList.length > 0 && (
             <div>
               {noticeList.map((n) => (
