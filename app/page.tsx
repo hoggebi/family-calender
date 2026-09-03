@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import './calendar.css';
 import { HOLIDAYS } from '@/lib/holidays';
 import { CalendarData, EventItem, EMPTY_DATA } from '@/lib/types';
@@ -268,6 +268,7 @@ export default function Home() {
   const [dayOpen, setDayOpen] = useState(false);
   const [activeDs, setActiveDs] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingRecurringId, setEditingRecurringId] = useState<string | null>(null);
   const [fTitle, setFTitle] = useState('');
   const [fTime, setFTime] = useState('');
   const [fMemberId, setFMemberId] = useState<string | null>(null);
@@ -293,26 +294,43 @@ export default function Home() {
   const [noticeDate, setNoticeDate] = useState('');
   const [noticeStatus, setNoticeStatus] = useState<{ text: string; error?: boolean }>({ text: '' });
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch('/api/calendar');
-        const json = (await res.json()) as CalendarData;
-        if (!res.ok) throw new Error('load failed');
-        setData({
-          members: json.members?.length ? json.members : EMPTY_DATA.members,
-          events: json.events || [],
-          recurring: json.recurring || [],
-          notices: json.notices || {},
-        });
-        setBanner({ text: '' });
-      } catch (e) {
-        setBanner({ text: '불러오기에 실패했어요. 새로고침 해주세요.', error: true });
-      } finally {
-        setLoading(false);
-      }
-    })();
+  const loadData = useCallback(async (opts?: { silent?: boolean }) => {
+    try {
+      const res = await fetch('/api/calendar');
+      const json = (await res.json()) as CalendarData;
+      if (!res.ok) throw new Error('load failed');
+      setData({
+        members: json.members?.length ? json.members : EMPTY_DATA.members,
+        events: json.events || [],
+        recurring: json.recurring || [],
+        notices: json.notices || {},
+      });
+      setBanner({ text: '' });
+    } catch (e) {
+      if (!opts?.silent) setBanner({ text: '불러오기에 실패했어요. 새로고침 해주세요.', error: true });
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // 다른 가족이 수정한 내용을 자동으로 반영: 주기적으로, 그리고 화면에 돌아올 때마다 새로고침
+  useEffect(() => {
+    const interval = setInterval(() => loadData({ silent: true }), 10000);
+    function onFocusOrVisible() {
+      if (document.visibilityState === 'visible') loadData({ silent: true });
+    }
+    document.addEventListener('visibilitychange', onFocusOrVisible);
+    window.addEventListener('focus', onFocusOrVisible);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onFocusOrVisible);
+      window.removeEventListener('focus', onFocusOrVisible);
+    };
+  }, [loadData]);
 
   useEffect(() => {
     if (!qMemberId && data.members.length) setQMemberId(data.members[0].id);
@@ -378,6 +396,7 @@ export default function Home() {
 
   function clearForm() {
     setEditingId(null);
+    setEditingRecurringId(null);
     setFTitle('');
     setFTime('');
     setFMemo('');
@@ -388,11 +407,11 @@ export default function Home() {
 
   function handleRowClick(ev: DisplayEvent) {
     if (ev.isRecurring) {
-      if (confirm(`이 반복 일정을 삭제할까요?\n${ev.title} (매주 반복)`)) {
-        deleteRecurring(ev.id);
-      }
+      setEditingId(null);
+      setEditingRecurringId(ev.id);
       return;
     }
+    setEditingRecurringId(null);
     setEditingId(ev.id);
     setFTitle(ev.title);
     setFTime(ev.time || '');
@@ -857,45 +876,79 @@ export default function Home() {
                 </div>
               ))}
             </div>
-            <div className="field">
-              <label>제목</label>
-              <input type="text" maxLength={40} placeholder="예: 병원 예약" value={fTitle} onChange={(e) => setFTitle(e.target.value)} />
-            </div>
-            <div className="field">
-              <label>시간 (선택)</label>
-              <input type="time" value={fTime} onChange={(e) => setFTime(e.target.value)} />
-            </div>
-            {!editingId && (
-              <div className="field">
-                <label>종료일 (선택 — 여러 날짜에 걸친 일정이면)</label>
-                <input type="date" min={activeDs || undefined} value={fEndDate} onChange={(e) => setFEndDate(e.target.value)} />
-              </div>
-            )}
-            <div className="field">
-              <label>누구 일정인가요?</label>
-              <div className="member-pick">
-                {data.members.map((mem) => (
-                  <div
-                    key={mem.id}
-                    className={`chip${fMemberId === mem.id ? ' selected' : ''}`}
-                    onClick={() => setFMemberId(mem.id)}
-                  >
-                    <MemberBadge data={data} memberId={mem.id} size={20} />
-                    <span>{mem.name}</span>
+            {editingRecurringId ? (
+              (() => {
+                const rec = data.recurring.find((r) => r.id === editingRecurringId);
+                if (!rec) return null;
+                const mem = memberById(data, rec.memberId);
+                const days = [...rec.weekdays].sort().map((w) => DAY_NAMES[w]).join(',');
+                return (
+                  <div className="group-edit-hint">
+                    🔁 반복 일정은 요일·제목 수정은 지원하지 않아요. 바꾸려면 삭제 후 다시 등록해주세요.
+                    <div style={{ marginTop: 6, fontWeight: 700 }}>
+                      {rec.personLabel || mem?.name || '미지정'} · 매주 {days}{rec.time ? ' ' + rec.time : ''} {rec.title}
+                    </div>
                   </div>
-                ))}
-              </div>
-            </div>
-            <div className="field">
-              <label>메모 (선택)</label>
-              <textarea maxLength={200} value={fMemo} onChange={(e) => setFMemo(e.target.value)} />
-            </div>
+                );
+              })()
+            ) : (
+              <>
+                <div className="field">
+                  <label>제목</label>
+                  <input type="text" maxLength={40} placeholder="예: 병원 예약" value={fTitle} onChange={(e) => setFTitle(e.target.value)} />
+                </div>
+                <div className="field">
+                  <label>시간 (선택)</label>
+                  <input type="time" value={fTime} onChange={(e) => setFTime(e.target.value)} />
+                </div>
+                {!editingId && (
+                  <div className="field">
+                    <label>종료일 (선택 — 여러 날짜에 걸친 일정이면)</label>
+                    <input type="date" min={activeDs || undefined} value={fEndDate} onChange={(e) => setFEndDate(e.target.value)} />
+                  </div>
+                )}
+                <div className="field">
+                  <label>누구 일정인가요?</label>
+                  <div className="member-pick">
+                    {data.members.map((mem) => (
+                      <div
+                        key={mem.id}
+                        className={`chip${fMemberId === mem.id ? ' selected' : ''}`}
+                        onClick={() => setFMemberId(mem.id)}
+                      >
+                        <MemberBadge data={data} memberId={mem.id} size={20} />
+                        <span>{mem.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="field">
+                  <label>메모 (선택)</label>
+                  <textarea maxLength={200} value={fMemo} onChange={(e) => setFMemo(e.target.value)} />
+                </div>
+              </>
+            )}
             <div className={`quick-add-status${formStatus.error ? ' error' : ''}`}>{formStatus.text}</div>
             <div className="modal-actions">
               {editingId && <button className="btn btn-danger" onClick={deleteEvent}>삭제</button>}
+              {editingRecurringId && (
+                <button
+                  className="btn btn-danger"
+                  onClick={() => {
+                    if (confirm('이 반복 일정을 삭제할까요? 모든 주에서 사라져요.')) {
+                      deleteRecurring(editingRecurringId);
+                      setDayOpen(false);
+                    }
+                  }}
+                >
+                  반복 일정 삭제
+                </button>
+              )}
               <div style={{ flex: 1 }} />
               <button className="btn btn-secondary" onClick={() => setDayOpen(false)}>닫기</button>
-              <button className="btn btn-primary" disabled={formBusy} onClick={saveEvent}>저장</button>
+              {!editingRecurringId && (
+                <button className="btn btn-primary" disabled={formBusy} onClick={saveEvent}>저장</button>
+              )}
             </div>
           </div>
         </div>
