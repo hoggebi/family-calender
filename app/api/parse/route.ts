@@ -2,15 +2,35 @@ import { NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 import { HOLIDAYS } from '@/lib/holidays';
 
+// Vercel 서버리스 함수 기본 제한(보통 10초)보다 여유를 두어
+// Gemini 응답이 조금 늦어도 중간에 끊기지 않도록 함
+export const maxDuration = 30;
+
 // 기존 오늘도 호 English 앱(lib/gemini.ts)과 동일한 방식으로 GEMINI_API_KEY를 사용합니다.
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY as string });
 const MODEL = 'gemini-3.6-flash';
+
+// 매번 3년치 공휴일(약 40개)을 전부 프롬프트에 넣으면 속도가 느려지므로,
+// 오늘 기준 앞뒤 몇 달치만 추려서 보냄 (프롬프트 크기 = 응답 속도에 직결)
+function nearbyHolidays(todayIso: string) {
+  const start = new Date(todayIso + 'T00:00:00');
+  start.setMonth(start.getMonth() - 2);
+  const end = new Date(todayIso + 'T00:00:00');
+  end.setMonth(end.getMonth() + 8);
+  const startStr = start.toISOString().slice(0, 10);
+  const endStr = end.toISOString().slice(0, 10);
+  const out: Record<string, string> = {};
+  for (const [d, name] of Object.entries(HOLIDAYS)) {
+    if (d >= startStr && d <= endStr) out[d] = name;
+  }
+  return out;
+}
 
 function buildQuickAddPrompt(todayIso: string, membersList: string) {
   return `너는 한국어 가족 캘린더의 빠른입력 문장을 분석해서 JSON으로만 응답하는 파서야. 설명, 인사말, 코드블록 없이 JSON 객체 하나만 출력해.
 현재 날짜: ${todayIso}
 등록된 가족 구성원 이름: ${membersList}
-공휴일/명절 참고자료 (YYYY-MM-DD: 이름): ${JSON.stringify(HOLIDAYS)}
+공휴일/명절 참고자료 (YYYY-MM-DD: 이름): ${JSON.stringify(nearbyHolidays(todayIso))}
 
 다음 스키마의 JSON만 출력해:
 {
@@ -31,17 +51,19 @@ function buildQuickAddPrompt(todayIso: string, membersList: string) {
 - type: 특정 요일에 매주 반복되면 "weekly", 시작일~종료일이 있는 여러 날짜면 "range", 하루짜리 일정이면 "once".
 - weekdays: 0=일,1=월,2=화,3=수,4=목,5=금,6=토.
 - 날짜는 공휴일 참고자료와 현재 날짜를 기준으로 올바른 연도의 YYYY-MM-DD로 계산해.
-- 날짜를 전혀 특정할 수 없으면 type은 "once", date는 오늘 날짜로 해.`;
+- 날짜를 전혀 특정할 수 없으면 type은 "once", date는 오늘 날짜로 해.
+- 다른 설명 없이 JSON만, 최대한 짧고 빠르게 출력해.`;
 }
 
 function buildNoticePrompt(todayIso: string, ky: number, km: number) {
   return `너는 한국어 공지사항 문장에서 날짜를 찾아 JSON으로만 응답하는 파서야. 설명, 인사말, 코드블록 없이 JSON 객체 하나만 출력해.
 현재 날짜: ${todayIso}
 이 문장은 ${ky}년 ${km}월 공지사항 목록에 적힌 거야. "15일"처럼 일자만 있으면 ${ky}년 ${km}월로 간주해.
-공휴일/명절 참고자료 (YYYY-MM-DD: 이름): ${JSON.stringify(HOLIDAYS)}
+공휴일/명절 참고자료 (YYYY-MM-DD: 이름): ${JSON.stringify(nearbyHolidays(todayIso))}
 
 스키마: {"date": "YYYY-MM-DD" 또는 null}
-문장에서 특정 날짜(또는 명절 이름)를 찾을 수 있으면 date를 채우고, 날짜를 전혀 알 수 없으면 null로 해.`;
+문장에서 특정 날짜(또는 명절 이름)를 찾을 수 있으면 date를 채우고, 날짜를 전혀 알 수 없으면 null로 해.
+다른 설명 없이 JSON만, 최대한 짧고 빠르게 출력해.`;
 }
 
 export async function POST(req: Request) {
@@ -65,7 +87,14 @@ export async function POST(req: Request) {
     const response = await ai.models.generateContent({
       model: MODEL,
       contents: text,
-      config: { systemInstruction },
+      config: {
+        systemInstruction,
+        temperature: 0,
+        maxOutputTokens: 300,
+        // 지원되는 모델이면 "생각하는 시간"을 꺼서 단순 추출 작업 속도를 높임
+        // (지원 안 하는 모델이면 이 필드는 무시됨)
+        thinkingConfig: { thinkingBudget: 0 },
+      } as any,
     });
 
     const raw = response.text ?? '';
