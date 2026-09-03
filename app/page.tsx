@@ -660,23 +660,6 @@ export default function Home() {
           <span className={`quick-add-status${quickStatus.error ? ' error' : ''}`}>{quickStatus.text}</span>
           <button className="btn btn-primary" onClick={quickAdd}>추가</button>
         </div>
-
-        {data.recurring.length > 0 && (
-          <div>
-            <div className="recurring-title">🔁 반복 일정</div>
-            {data.recurring.map((r) => {
-              const mem = memberById(data, r.memberId);
-              const days = [...r.weekdays].sort().map((w) => DAY_NAMES[w]).join(',');
-              return (
-                <div className="recurring-row" key={r.id}>
-                  <MemberBadge data={data} memberId={r.memberId} size={18} />
-                  <span className="txt">{r.personLabel || mem?.name || '미지정'} · 매주 {days}{r.time ? ' ' + r.time : ''} {r.title}</span>
-                  <button aria-label="반복 일정 삭제" onClick={() => deleteRecurring(r.id)}>×</button>
-                </div>
-              );
-            })}
-          </div>
-        )}
       </div>
 
       <div className="footer-row">

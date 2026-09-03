@@ -127,12 +127,6 @@ header { text-align: center; margin-bottom: 14px; }
 .quick-add-status { font-size: 12px; color: var(--moss-dark); margin-top: 8px; min-height: 14px; }
 .quick-add-status.error { color: var(--danger); }
 
-.recurring-title { font-size: 11px; color: var(--ink-soft); margin-top: 10px; margin-bottom: 4px; }
-.recurring-row { display: flex; align-items: center; gap: 8px; background: var(--paper-edge); border-radius: 8px; padding: 6px 9px; margin-top: 5px; font-size: 12.5px; }
-.recurring-row .txt { flex: 1; }
-.recurring-row button { border: none; background: transparent; color: var(--ink-soft); cursor: pointer; font-size: 14px; }
-.recurring-row button:hover { color: var(--danger); }
-
 .footer-row { text-align: center; margin-top: 18px; }
 .reset-link { font-size: 11px; color: var(--ink-soft); background: none; border: none; text-decoration: underline; cursor: pointer; padding: 10px; }
 
