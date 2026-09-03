@@ -96,7 +96,7 @@ export default function Home() {
     if (!qMemberId && data.members.length) setQMemberId(data.members[0].id);
   }, [data.members, qMemberId]);
 
-
+  async function persist(next: CalendarData): Promise<boolean> {
     setData(next);
     try {
       const res = await fetch('/api/calendar', {
