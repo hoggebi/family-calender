@@ -3,14 +3,14 @@
   width: 100%;
   margin: 0 auto;
   position: relative;
-  padding: 18px 10px 40px;
+  padding: 10px 10px 40px;
 }
 
-header { text-align: center; margin-bottom: 14px; }
-.title { font-family: 'KyoboHand2019', 'Pretendard Variable', Pretendard, -apple-system, sans-serif; font-size: 36px; font-weight: 400; color: var(--moss-dark); margin: 0; }
-.subtitle { font-size: 11.5px; color: var(--ink-soft); margin-top: 3px; }
+header { text-align: center; margin-bottom: 6px; }
+.title { font-family: 'KyoboHand2019', 'Pretendard Variable', Pretendard, -apple-system, sans-serif; font-size: 36px; font-weight: 400; color: var(--moss-dark); margin: 0; line-height: 1.1; }
+.subtitle { font-size: 11.5px; color: var(--ink-soft); margin-top: 2px; }
 
-.status-banner { text-align: center; font-size: 12px; color: var(--ink-soft); margin-bottom: 10px; min-height: 14px; }
+.status-banner { text-align: center; font-size: 12px; color: var(--ink-soft); margin-bottom: 4px; min-height: 0; }
 .status-banner.error { color: var(--danger); }
 
 .notice-box {
@@ -39,7 +39,7 @@ header { text-align: center; margin-bottom: 14px; }
 .notice-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
 .notice-status { font-size: 11px; color: var(--ink-soft); }
 
-.family-strip { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; align-items: center; margin-bottom: 14px; }
+.family-strip { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; align-items: center; margin-bottom: 8px; }
 .chip {
   display: flex; align-items: center; gap: 6px;
   background: var(--paper); border: 1px solid var(--line); border-radius: 20px;
@@ -106,7 +106,7 @@ header { text-align: center; margin-bottom: 14px; }
   background: var(--line); border: 1px solid var(--line); border-bottom: 1px solid var(--line);
   border-radius: 10px 10px 0 0; overflow: hidden;
 }
-.weekdays div { text-align: center; font-size: 9.5px; font-weight: 600; color: var(--ink-soft); padding: 8px 0; background: var(--paper); letter-spacing: 0.2px; }
+.weekdays div { text-align: center; font-size: 11.5px; font-weight: 700; color: var(--ink-soft); padding: 2px 0; background: var(--paper); letter-spacing: 0.2px; }
 
 .grid { display: flex; flex-direction: column; gap: 1px; background: var(--line); border: 1px solid var(--line); border-top: none; border-radius: 0 0 10px 10px; overflow: hidden; }
 .week-wrap { position: relative; }
@@ -119,15 +119,15 @@ header { text-align: center; margin-bottom: 14px; }
 }
 .cell.empty { background: var(--paper-edge); border: none; box-shadow: none; cursor: default; }
 .cell.today { outline: 2px solid var(--moss); outline-offset: -2px; z-index: 1; }
-.cell-head { height: auto; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 0; width: 100%; margin-bottom: 1px; }
-.date-num { font-size: 11px; font-weight: 400; color: var(--ink); text-align: center; width: 100%; line-height: 1.2; }
-.cell.today .date-num { color: var(--moss-dark); font-weight: 500; }
+.cell-head { height: 28px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 0; width: 100%; margin-bottom: 1px; }
+.date-num { font-size: 12px; font-weight: 500; color: var(--ink); text-align: center; width: 100%; line-height: 1.25; }
+.cell.today .date-num { color: var(--moss-dark); font-weight: 700; }
 .cell.sun .date-num, .cell.holiday .date-num { color: var(--sun); }
 .cell.sat .date-num { color: var(--sat); }
 
 .holiday-label { font-size: 9px; color: var(--sun); font-weight: 500; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; width: 100%; text-align: center; }
 .note {
-  font-size: 9px; font-weight: 500; line-height: 1.2; padding: 1.5px 4px 3.5px; border-radius: 4px;
+  font-size: 9px; font-weight: 500; line-height: 1.2; padding: 3px 4px; border-radius: 4px;
   border-bottom: 3px solid transparent;
   color: white; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   min-width: 0; width: 100%; text-align: center;
@@ -135,7 +135,7 @@ header { text-align: center; margin-bottom: 14px; }
 .note.am, .mini-bar.am, .range-bar.am { border-bottom-color: var(--am); }
 .note.pm, .mini-bar.pm, .range-bar.pm { border-bottom-color: var(--pm); }
 .mini-bar {
-  font-size: 9px; font-weight: 500; line-height: 1.2; padding: 1.5px 4px 3.5px; border-radius: 4px;
+  font-size: 9px; font-weight: 500; line-height: 1.2; padding: 3px 4px; border-radius: 4px;
   border-bottom: 3px solid transparent;
   color: white; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   min-width: 0; width: 100%; text-align: center;

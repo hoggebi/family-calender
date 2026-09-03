@@ -807,7 +807,7 @@ export default function Home() {
           });
           const bars = Object.values(segments);
           const spacerHeight = bars.length > 0 ? bars.length * 19 : 0;
-          const overlayTop = 33;
+          const overlayTop = 30;
 
           return (
             <div className="week-wrap" key={wi}>
