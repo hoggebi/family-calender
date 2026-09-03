@@ -38,6 +38,13 @@ header { text-align: center; margin-bottom: 6px; }
 }
 .notice-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
 .notice-status { font-size: 11px; color: var(--ink-soft); }
+.notice-add-collapsed {
+  width: 100%; display: block; text-align: left;
+  background: var(--paper); border: 1px solid var(--line); border-radius: 12px;
+  padding: 10px 14px; margin-bottom: 14px; font-size: 13px; font-weight: 600;
+  color: var(--ink-soft); cursor: pointer; box-shadow: 0 1px 0 var(--shadow); font-family: inherit;
+}
+.notice-add-collapsed:active { background: var(--paper-edge); }
 
 .family-strip { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; align-items: center; margin-bottom: 8px; }
 .chip {
@@ -182,11 +189,11 @@ header { text-align: center; margin-bottom: 6px; }
 
 .day-events-list { display: flex; flex-direction: column; gap: 7px; margin-bottom: 14px; max-height: 240px; overflow-y: auto; }
 .group-edit-hint { font-size: 12px; color: var(--moss-dark); background: #eef2ee; border-radius: 8px; padding: 8px 10px; margin-bottom: 10px; line-height: 1.5; }
-.day-event-row { display: flex; align-items: center; gap: 4px; background: var(--paper-edge); border-radius: 8px; padding: 9px 10px; min-height: 40px; }
+.day-event-row { display: flex; align-items: center; gap: 4px; background: var(--paper-edge); border-radius: 8px; padding: 0 10px; min-height: 40px; }
 .day-event-row.am { background: var(--am-bg); }
 .day-event-row.pm { background: var(--pm-bg); }
-.day-event-main { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; cursor: pointer; }
-.day-event-row .txt { flex: 1; font-size: 13px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.day-event-main { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; cursor: pointer; padding: 9px 0; }
+.day-event-row .txt { flex: 1; font-size: 13px; line-height: 1.2; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .day-event-row .time { font-size: 11px; color: var(--ink-soft); flex-shrink: 0; }
 .del-btn { border: none; background: transparent; color: var(--ink-soft); cursor: pointer; font-size: 16px; line-height: 1; padding: 4px 2px; flex-shrink: 0; }
 .del-btn:hover { color: var(--danger); }

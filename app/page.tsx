@@ -70,15 +70,16 @@ function formatRange(start: string, end: string) {
   return `${sm}/${sd}~${em}/${ed}`;
 }
 
-// 시간(HH:MM) 또는 제목·메모 속 "오전/오후" 같은 표기를 보고 오전/오후 구분 (색으로 표시하기 위한 클래스명)
+// 시간(HH:MM) 또는 제목·메모 속 표기를 보고 낮/저녁 구분 (색으로 표시하기 위한 클래스명)
+// 저녁(pm 색)은 오후 4시(16시) 이후, 그 전은 낮(am 색)
 function timeSlot(time: string, text?: string): 'am' | 'pm' | '' {
   if (time) {
     const h = Number(time.split(':')[0]);
-    if (!Number.isNaN(h)) return h < 12 ? 'am' : 'pm';
+    if (!Number.isNaN(h)) return h < 16 ? 'am' : 'pm';
   }
   if (text) {
-    if (/오전|새벽/.test(text)) return 'am';
-    if (/오후|저녁|밤/.test(text)) return 'pm';
+    if (/저녁|밤/.test(text)) return 'pm';
+    if (/오전|새벽|오후|낮/.test(text)) return 'am';
   }
   return '';
 }
@@ -340,6 +341,7 @@ export default function Home() {
   const [noticeText, setNoticeText] = useState('');
   const [noticeDate, setNoticeDate] = useState('');
   const [noticeStatus, setNoticeStatus] = useState<{ text: string; error?: boolean }>({ text: '' });
+  const [noticeOpen, setNoticeOpen] = useState(false);
 
   const loadData = useCallback(async (opts?: { silent?: boolean }) => {
     try {
@@ -732,35 +734,39 @@ export default function Home() {
 
       {tab === 'calendar' && (
       <div className="tab-page">
-      <div className="notice-box">
-        <div className="notice-label">📌 {m + 1}월 주요 공지사항</div>
-        <div>
-          {noticeList.length === 0 ? (
-            <div className="notice-empty">아직 등록된 공지사항이 없어요.</div>
-          ) : (
-            noticeList.map((n) => (
-              <div className="notice-row" key={n.id}>
-                <span className="txt" dangerouslySetInnerHTML={{ __html: (n.date ? `<b>${Number(n.date.split('-')[2])}일</b> ` : '') + escapeHtml(n.text) }} />
-                <button aria-label="공지사항 삭제" onClick={() => deleteNotice(n.id)}>×</button>
-              </div>
-            ))
+      {noticeList.length === 0 && !noticeOpen ? (
+        <button className="notice-add-collapsed" onClick={() => setNoticeOpen(true)}>
+          📌 {m + 1}월 공지사항 추가하기
+        </button>
+      ) : (
+        <div className="notice-box">
+          <div className="notice-label">📌 {m + 1}월 주요 공지사항</div>
+          {noticeList.length > 0 && (
+            <div>
+              {noticeList.map((n) => (
+                <div className="notice-row" key={n.id}>
+                  <span className="txt" dangerouslySetInnerHTML={{ __html: (n.date ? `<b>${Number(n.date.split('-')[2])}일</b> ` : '') + escapeHtml(n.text) }} />
+                  <button aria-label="공지사항 삭제" onClick={() => deleteNotice(n.id)}>×</button>
+                </div>
+              ))}
+            </div>
           )}
+          <textarea
+            className="notice-textarea"
+            placeholder="예: 학부모 참관수업, 관리비 납부일"
+            value={noticeText}
+            onChange={(e) => setNoticeText(e.target.value)}
+          />
+          <div className="field" style={{ marginTop: 8 }}>
+            <label>날짜 (선택 — 달력에도 표시하려면)</label>
+            <input type="date" value={noticeDate} onChange={(e) => setNoticeDate(e.target.value)} />
+          </div>
+          <div className="notice-actions">
+            <span className={`notice-status${noticeStatus.error ? ' error' : ''}`}>{noticeStatus.text}</span>
+            <button className="btn btn-primary" onClick={addNotice}>추가</button>
+          </div>
         </div>
-        <textarea
-          className="notice-textarea"
-          placeholder="예: 학부모 참관수업, 관리비 납부일"
-          value={noticeText}
-          onChange={(e) => setNoticeText(e.target.value)}
-        />
-        <div className="field" style={{ marginTop: 8 }}>
-          <label>날짜 (선택 — 달력에도 표시하려면)</label>
-          <input type="date" value={noticeDate} onChange={(e) => setNoticeDate(e.target.value)} />
-        </div>
-        <div className="notice-actions">
-          <span className={`notice-status${noticeStatus.error ? ' error' : ''}`}>{noticeStatus.text}</span>
-          <button className="btn btn-primary" onClick={addNotice}>추가</button>
-        </div>
-      </div>
+      )}
 
       <div className="nav-row">
         <button className="nav-btn" aria-label="이전 달" onClick={() => setCur(new Date(y, m - 1, 1))}>‹</button>
