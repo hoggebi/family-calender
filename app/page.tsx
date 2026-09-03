@@ -70,11 +70,17 @@ function formatRange(start: string, end: string) {
   return `${sm}/${sd}~${em}/${ed}`;
 }
 
-// 시간을 기준으로 오전/오후 구분 (색으로 표시하기 위한 클래스명)
-function timeSlot(time: string): 'am' | 'pm' | '' {
-  if (!time) return '';
-  const h = Number(time.split(':')[0]);
-  return h < 12 ? 'am' : 'pm';
+// 시간(HH:MM) 또는 제목·메모 속 "오전/오후" 같은 표기를 보고 오전/오후 구분 (색으로 표시하기 위한 클래스명)
+function timeSlot(time: string, text?: string): 'am' | 'pm' | '' {
+  if (time) {
+    const h = Number(time.split(':')[0]);
+    if (!Number.isNaN(h)) return h < 12 ? 'am' : 'pm';
+  }
+  if (text) {
+    if (/오전|새벽/.test(text)) return 'am';
+    if (/오후|저녁|밤/.test(text)) return 'pm';
+  }
+  return '';
 }
 
 function MonthHighlights({
@@ -800,7 +806,7 @@ export default function Home() {
             });
           });
           const bars = Object.values(segments);
-          const spacerHeight = bars.length > 0 ? bars.length * 16 : 0;
+          const spacerHeight = bars.length > 0 ? bars.length * 19 : 0;
           const overlayTop = 33;
 
           return (
@@ -822,7 +828,7 @@ export default function Home() {
                   const dayEvents = allDayEvents.filter((e) => !e.isRecurring);
                   const shown = dayEvents.slice(0, 3);
                   const colSpacer = bars.reduce(
-                    (max, bar, idx) => (ci >= bar.minCol && ci <= bar.maxCol ? Math.max(max, (idx + 1) * 16) : max),
+                    (max, bar, idx) => (ci >= bar.minCol && ci <= bar.maxCol ? Math.max(max, (idx + 1) * 19) : max),
                     0
                   );
 
@@ -835,9 +841,10 @@ export default function Home() {
                       {colSpacer > 0 && <div style={{ height: colSpacer }} />}
                       {recurringEvents.map((ev) => {
                         const mems = membersOf(data, memberIdsOf(ev));
+                        const slot = timeSlot(ev.time, `${ev.title} ${ev.memo}`);
                         return (
                           <div
-                            className={`mini-bar${timeSlot(ev.time) ? ' ' + timeSlot(ev.time) : ''}`}
+                            className={`mini-bar${slot ? ' ' + slot : ''}`}
                             key={ev.id}
                             style={{ background: multiColor(mems.map((mem) => mem.color)) }}
                             onClick={(e2) => { e2.stopPropagation(); openDay(ds, ev.id); }}
@@ -850,9 +857,10 @@ export default function Home() {
                         const mems = membersOf(data, memberIdsOf(ev));
                         const bg = ev.isNotice ? '#111111' : multiColor(mems.map((mem) => mem.color));
                         const prefix = ev.isNotice ? '📌 ' : '';
+                        const slot = timeSlot(ev.time, `${ev.title} ${ev.memo}`);
                         return (
                           <div
-                            className={`note${timeSlot(ev.time) ? ' ' + timeSlot(ev.time) : ''}`}
+                            className={`note${slot ? ' ' + slot : ''}`}
                             key={ev.id}
                             style={{ background: bg }}
                             onClick={(e2) => { e2.stopPropagation(); openDay(ds, ev.id); }}
@@ -870,12 +878,12 @@ export default function Home() {
                 <div className="week-bars" style={{ top: overlayTop, height: spacerHeight }}>
                   {bars.map((bar, idx) => (
                     <div
-                      className={`range-bar${timeSlot(bar.time) ? ' ' + timeSlot(bar.time) : ''}`}
+                      className={`range-bar${timeSlot(bar.time, bar.title) ? ' ' + timeSlot(bar.time, bar.title) : ''}`}
                       key={idx}
                       style={{
                         left: `calc(${(bar.minCol * 100) / 7}% + 2px)`,
                         width: `calc(${((bar.maxCol - bar.minCol + 1) * 100) / 7}% - 4px)`,
-                        top: idx * 16,
+                        top: idx * 19,
                         background: bar.color,
                       }}
                       onClick={() => openDay(bar.startDs)}
@@ -982,7 +990,7 @@ export default function Home() {
             <h2>{Number(activeDs.split('-')[1])}월 {Number(activeDs.split('-')[2])}일 일정{HOLIDAYS[activeDs] ? ` (${HOLIDAYS[activeDs]})` : ''}</h2>
             <div className="day-events-list">
               {(getEventsForDate(data, activeDs) as DisplayEvent[]).map((ev) => (
-                <div className={`day-event-row${timeSlot(ev.time) ? ' ' + timeSlot(ev.time) : ''}`} key={ev.id}>
+                <div className={`day-event-row${timeSlot(ev.time, `${ev.title} ${ev.memo}`) ? ' ' + timeSlot(ev.time, `${ev.title} ${ev.memo}`) : ''}`} key={ev.id}>
                   <div className="day-event-main" onClick={() => handleRowClick(ev)}>
                     <MemberBadge data={data} memberIds={memberIdsOf(ev)} isNotice={ev.isNotice} size={18} />
                     <span className="txt">{ev.isNotice ? '📌 ' : ev.isRecurring ? '🔁 ' : ''}{ev.title}</span>

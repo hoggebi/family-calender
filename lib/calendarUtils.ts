@@ -18,12 +18,11 @@ export function membersOf(data: CalendarData, ids: string[]): Member[] {
   return ids.map((id) => data.members.find((m) => m.id === id)).filter((m): m is Member => Boolean(m));
 }
 
-// 담당자가 여러 명이면 색을 균등하게 나눠 표시
+// 담당자가 여러 명이면 색이 자연스럽게 섞이는 그라데이션으로 표시
 export function multiColor(colors: string[]): string {
   if (colors.length === 0) return '#999';
   if (colors.length === 1) return colors[0];
-  const step = 100 / colors.length;
-  return `linear-gradient(90deg, ${colors.map((c, i) => `${c} ${i * step}%, ${c} ${(i + 1) * step}%`).join(', ')})`;
+  return `linear-gradient(90deg, ${colors.join(', ')})`;
 }
 
 export function findMemberByLabel(data: CalendarData, label: string): string | null {
