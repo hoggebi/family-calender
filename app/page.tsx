@@ -9,7 +9,6 @@ import {
   todayStr,
   monthKey as makeMonthKey,
   memberById,
-  findMemberByLabel,
   getEventsForDate,
   buildWeeks,
 } from '@/lib/calendarUtils';
@@ -31,6 +30,8 @@ function MemberBadge({ data, memberId, isNotice, isRecurring, size = 18 }: { dat
   return <span className="dot" style={{ background: mem ? mem.color : '#999' }} />;
 }
 
+const DAY_NAMES = ['일', '월', '화', '수', '목', '금', '토'];
+
 export default function Home() {
   const [data, setData] = useState<CalendarData>(EMPTY_DATA);
   const [loading, setLoading] = useState(true);
@@ -50,18 +51,26 @@ export default function Home() {
   const [fTime, setFTime] = useState('');
   const [fMemberId, setFMemberId] = useState<string | null>(null);
   const [fMemo, setFMemo] = useState('');
+  const [fEndDate, setFEndDate] = useState('');
   const [formStatus, setFormStatus] = useState<{ text: string; error?: boolean }>({ text: '' });
   const [formBusy, setFormBusy] = useState(false);
 
-  // quick add
-  const [quickText, setQuickText] = useState('');
+  // 빠른 일정 입력 (AI 없이 직접 선택)
+  const [qType, setQType] = useState<'once' | 'range' | 'weekly'>('once');
+  const [qMemberId, setQMemberId] = useState<string | null>(null);
+  const [qTitle, setQTitle] = useState('');
+  const [qTime, setQTime] = useState('');
+  const [qMemo, setQMemo] = useState('');
+  const [qDate, setQDate] = useState('');
+  const [qStartDate, setQStartDate] = useState('');
+  const [qEndDate, setQEndDate] = useState('');
+  const [qWeekdays, setQWeekdays] = useState<number[]>([]);
   const [quickStatus, setQuickStatus] = useState<{ text: string; error?: boolean }>({ text: '' });
-  const [quickBusy, setQuickBusy] = useState(false);
 
-  // notice
+  // notice (날짜는 직접 선택)
   const [noticeText, setNoticeText] = useState('');
+  const [noticeDate, setNoticeDate] = useState('');
   const [noticeStatus, setNoticeStatus] = useState<{ text: string; error?: boolean }>({ text: '' });
-  const [noticeBusy, setNoticeBusy] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -83,7 +92,11 @@ export default function Home() {
     })();
   }, []);
 
-  async function persist(next: CalendarData): Promise<boolean> {
+  useEffect(() => {
+    if (!qMemberId && data.members.length) setQMemberId(data.members[0].id);
+  }, [data.members, qMemberId]);
+
+
     setData(next);
     try {
       const res = await fetch('/api/calendar', {
@@ -126,6 +139,7 @@ export default function Home() {
     setFTitle('');
     setFTime('');
     setFMemo('');
+    setFEndDate('');
     setFMemberId(data.members[0]?.id ?? null);
     setFormStatus({ text: '' });
   }
@@ -163,6 +177,20 @@ export default function Home() {
     let events = data.events;
     if (editingId) {
       events = events.map((e) => (e.id === editingId ? { ...e, title, time: fTime, memberId: fMemberId, memo: fMemo } : e));
+    } else if (fEndDate && fEndDate > activeDs) {
+      // 종료일이 시작일보다 뒤면 여러 날짜에 걸친 일정(이어진 막대)으로 저장
+      const groupId = 'g_' + Date.now();
+      const next = [...events];
+      let dcur = new Date(activeDs + 'T00:00:00');
+      const dend = new Date(fEndDate + 'T00:00:00');
+      let count = 0;
+      while (dcur <= dend && count < 60) {
+        const ds = dateStr(dcur.getFullYear(), dcur.getMonth(), dcur.getDate());
+        next.push({ id: 'e_' + Date.now() + '_' + count, date: ds, title, time: fTime, memberId: fMemberId, memo: fMemo, groupId });
+        dcur.setDate(dcur.getDate() + 1);
+        count++;
+      }
+      events = next;
     } else {
       events = [...events, { id: 'e_' + Date.now(), date: activeDs, title, time: fTime, memberId: fMemberId, memo: fMemo }];
     }
@@ -183,110 +211,103 @@ export default function Home() {
     clearForm();
   }
 
+  function toggleQWeekday(w: number) {
+    setQWeekdays((prev) => (prev.includes(w) ? prev.filter((x) => x !== w) : [...prev, w].sort()));
+  }
+
+  function clearQuickForm() {
+    setQTitle('');
+    setQTime('');
+    setQMemo('');
+    setQDate('');
+    setQStartDate('');
+    setQEndDate('');
+    setQWeekdays([]);
+  }
+
   async function quickAdd() {
-    const text = quickText.trim();
-    if (!text) return;
-    setQuickBusy(true);
-    setQuickStatus({ text: 'AI가 문장을 읽고 있어요…' });
-    try {
-      const res = await fetch('/api/parse', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'quick', text, members: data.members.map((mm) => mm.name) }),
-      });
-      const parsed = await res.json();
-      if (parsed.error) throw new Error('parse failed');
-
-      let memberId: string | null = null;
-      if (parsed.personLabel && parsed.personLabel !== '미지정') {
-        memberId = findMemberByLabel(data, parsed.personLabel);
-      }
-      const title = (parsed.title || text).trim();
-      const time = parsed.time || '';
-      const memo = parsed.memo || '';
-      let confirmMsg = '';
-      let next: CalendarData = data;
-
-      if (parsed.type === 'weekly' && Array.isArray(parsed.weekdays) && parsed.weekdays.length) {
-        const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
-        next = {
-          ...data,
-          recurring: [
-            ...data.recurring,
-            { id: 'r_' + Date.now(), memberId, personLabel: parsed.personLabel || '', title, time, weekdays: parsed.weekdays, memo },
-          ],
-        };
-        confirmMsg = `매주 ${parsed.weekdays.map((w: number) => dayNames[w]).join(',')} 반복 일정으로 등록했어요: ${title}`;
-      } else if (parsed.type === 'range' && parsed.startDate && parsed.endDate) {
-        const groupId = 'g_' + Date.now();
-        const events = [...data.events];
-        let dcur = new Date(parsed.startDate + 'T00:00:00');
-        const dend = new Date(parsed.endDate + 'T00:00:00');
-        let count = 0;
-        while (dcur <= dend && count < 31) {
-          const ds = dateStr(dcur.getFullYear(), dcur.getMonth(), dcur.getDate());
-          events.push({ id: 'e_' + Date.now() + '_' + count, date: ds, title, time, memberId, memo, groupId });
-          dcur.setDate(dcur.getDate() + 1);
-          count++;
-        }
-        next = { ...data, events };
-        confirmMsg = `${parsed.startDate} ~ ${parsed.endDate} 일정으로 등록했어요: ${title}`;
-      } else if (parsed.date) {
-        next = { ...data, events: [...data.events, { id: 'e_' + Date.now(), date: parsed.date, title, time, memberId, memo }] };
-        confirmMsg = `${parsed.date} 일정으로 등록했어요: ${title}`;
-      } else {
-        throw new Error('no date resolved');
-      }
-
-      if (parsed.personLabel && parsed.personLabel !== '미지정' && !memberId) {
-        confirmMsg += ` ('${parsed.personLabel}'님은 가족 목록에 없어 색상 없이 등록했어요)`;
-      }
-
-      const ok = await persist(next);
-      if (!ok) {
-        setQuickStatus({ text: '저장에 실패했어요. 다시 시도해주세요.', error: true });
-      } else {
-        setQuickText('');
-        setQuickStatus({ text: confirmMsg });
-      }
-    } catch (e) {
-      setQuickStatus({ text: '문장을 이해하지 못했어요. 예: "호할아버지 화,목 오전 9시 수영"처럼 다시 적어주세요.', error: true });
-    } finally {
-      setQuickBusy(false);
+    const title = qTitle.trim();
+    if (!title) {
+      setQuickStatus({ text: '제목을 입력해주세요.', error: true });
+      return;
     }
+    if (!qMemberId) {
+      setQuickStatus({ text: '담당자를 선택해주세요.', error: true });
+      return;
+    }
+    let next: CalendarData = data;
+
+    if (qType === 'weekly') {
+      if (!qWeekdays.length) {
+        setQuickStatus({ text: '반복할 요일을 선택해주세요.', error: true });
+        return;
+      }
+      next = {
+        ...data,
+        recurring: [
+          ...data.recurring,
+          { id: 'r_' + Date.now(), memberId: qMemberId, personLabel: memberById(data, qMemberId)?.name || '', title, time: qTime, weekdays: qWeekdays, memo: qMemo },
+        ],
+      };
+    } else if (qType === 'range') {
+      if (!qStartDate || !qEndDate) {
+        setQuickStatus({ text: '시작일과 종료일을 선택해주세요.', error: true });
+        return;
+      }
+      if (qEndDate < qStartDate) {
+        setQuickStatus({ text: '종료일이 시작일보다 빠를 수 없어요.', error: true });
+        return;
+      }
+      const groupId = 'g_' + Date.now();
+      const events = [...data.events];
+      let dcur = new Date(qStartDate + 'T00:00:00');
+      const dend = new Date(qEndDate + 'T00:00:00');
+      let count = 0;
+      while (dcur <= dend && count < 60) {
+        const ds = dateStr(dcur.getFullYear(), dcur.getMonth(), dcur.getDate());
+        events.push({ id: 'e_' + Date.now() + '_' + count, date: ds, title, time: qTime, memberId: qMemberId, memo: qMemo, groupId });
+        dcur.setDate(dcur.getDate() + 1);
+        count++;
+      }
+      next = { ...data, events };
+    } else {
+      if (!qDate) {
+        setQuickStatus({ text: '날짜를 선택해주세요.', error: true });
+        return;
+      }
+      next = { ...data, events: [...data.events, { id: 'e_' + Date.now(), date: qDate, title, time: qTime, memberId: qMemberId, memo: qMemo }] };
+    }
+
+    setQuickStatus({ text: '저장 중…' });
+    const ok = await persist(next);
+    if (!ok) {
+      setQuickStatus({ text: '저장에 실패했어요. 다시 시도해주세요.', error: true });
+      return;
+    }
+    clearQuickForm();
+    setQuickStatus({ text: '등록했어요.' });
   }
 
   async function addNotice() {
     const val = noticeText.trim();
     if (!val) return;
-    setNoticeBusy(true);
-    setNoticeStatus({ text: 'AI가 날짜를 확인하고 있어요…' });
     const notice = { id: 'n_' + Date.now(), text: val, date: null as string | null, eventId: null as string | null };
     let events = data.events;
-    try {
-      const res = await fetch('/api/parse', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'notice', text: val, monthKey: mKey }),
-      });
-      const parsed = await res.json();
-      if (parsed && parsed.date) {
-        const eventId = 'e_' + Date.now();
-        events = [...events, { id: eventId, date: parsed.date, title: val, time: '', memberId: null, memo: '', isNotice: true, noticeId: notice.id }];
-        notice.date = parsed.date;
-        notice.eventId = eventId;
-      }
-    } catch (e) {
-      // 날짜를 못 찾아도 공지 목록엔 남긴다
+    if (noticeDate) {
+      const eventId = 'e_' + Date.now();
+      events = [...events, { id: eventId, date: noticeDate, title: val, time: '', memberId: null, memo: '', isNotice: true, noticeId: notice.id }];
+      notice.date = noticeDate;
+      notice.eventId = eventId;
     }
     const notices = { ...data.notices, [mKey]: [...(data.notices[mKey] || []), notice] };
+    setNoticeStatus({ text: '저장 중…' });
     const ok = await persist({ ...data, events, notices });
-    setNoticeBusy(false);
     if (!ok) {
       setNoticeStatus({ text: '저장에 실패했어요. 다시 시도해주세요.', error: true });
       return;
     }
     setNoticeText('');
+    setNoticeDate('');
     setNoticeStatus({ text: notice.date ? `등록했어요 · ${notice.date} 달력에도 표시돼요` : '등록했어요' });
   }
 
@@ -331,13 +352,17 @@ export default function Home() {
         </div>
         <textarea
           className="notice-textarea"
-          placeholder="예: 15일 학부모 참관수업, 20일 관리비 납부일"
+          placeholder="예: 학부모 참관수업, 관리비 납부일"
           value={noticeText}
           onChange={(e) => setNoticeText(e.target.value)}
         />
+        <div className="field" style={{ marginTop: 8 }}>
+          <label>날짜 (선택 — 달력에도 표시하려면)</label>
+          <input type="date" value={noticeDate} onChange={(e) => setNoticeDate(e.target.value)} />
+        </div>
         <div className="notice-actions">
           <span className={`notice-status${noticeStatus.error ? ' error' : ''}`}>{noticeStatus.text}</span>
-          <button className="btn btn-primary" disabled={noticeBusy} onClick={addNotice}>추가</button>
+          <button className="btn btn-primary" onClick={addNotice}>추가</button>
         </div>
       </div>
 
@@ -453,26 +478,85 @@ export default function Home() {
       </div>
 
       <div className="quick-add">
-        <label className="quick-add-label">✏️ 빠른 일정 입력</label>
-        <div className="quick-add-row">
-          <input
-            type="text"
-            placeholder="예: 호할아버지 화,목 오전 9시 수영 / 나 추석연휴 25~28일 호랑 시즈오카"
-            value={quickText}
-            onChange={(e) => setQuickText(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); quickAdd(); } }}
-          />
-          <button className="btn btn-primary" disabled={quickBusy} onClick={quickAdd}>추가</button>
+        <label className="quick-add-label">✏️ 일정 빠르게 추가</label>
+
+        <div className="field">
+          <label>담당자</label>
+          <div className="member-pick">
+            {data.members.map((mem) => (
+              <div key={mem.id} className={`chip${qMemberId === mem.id ? ' selected' : ''}`} onClick={() => setQMemberId(mem.id)}>
+                <MemberBadge data={data} memberId={mem.id} size={20} />
+                <span>{mem.name}</span>
+              </div>
+            ))}
+          </div>
         </div>
-        <div className="quick-add-hint">문장으로 적으면 AI가 알아서 날짜를 읽고 달력에 넣어줘요. 매주 반복이면 "화,목마다"처럼, 여행처럼 며칠 이어지면 날짜 범위를 적어주세요.</div>
-        <div className={`quick-add-status${quickStatus.error ? ' error' : ''}`}>{quickStatus.text}</div>
+
+        <div className="field">
+          <label>제목</label>
+          <input type="text" maxLength={40} placeholder="예: 수영, 시즈오카 여행" value={qTitle} onChange={(e) => setQTitle(e.target.value)} />
+        </div>
+
+        <div className="field">
+          <label>일정 종류</label>
+          <div className="member-pick">
+            <div className={`chip${qType === 'once' ? ' selected' : ''}`} onClick={() => setQType('once')}><span>하루</span></div>
+            <div className={`chip${qType === 'range' ? ' selected' : ''}`} onClick={() => setQType('range')}><span>여러 날</span></div>
+            <div className={`chip${qType === 'weekly' ? ' selected' : ''}`} onClick={() => setQType('weekly')}><span>매주 반복</span></div>
+          </div>
+        </div>
+
+        {qType === 'once' && (
+          <div className="field">
+            <label>날짜</label>
+            <input type="date" value={qDate} onChange={(e) => setQDate(e.target.value)} />
+          </div>
+        )}
+
+        {qType === 'range' && (
+          <div className="field">
+            <label>시작일 ~ 종료일</label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input type="date" value={qStartDate} onChange={(e) => setQStartDate(e.target.value)} />
+              <input type="date" value={qEndDate} min={qStartDate || undefined} onChange={(e) => setQEndDate(e.target.value)} />
+            </div>
+          </div>
+        )}
+
+        {qType === 'weekly' && (
+          <div className="field">
+            <label>반복 요일</label>
+            <div className="member-pick">
+              {DAY_NAMES.map((label, w) => (
+                <div key={w} className={`chip${qWeekdays.includes(w) ? ' selected' : ''}`} onClick={() => toggleQWeekday(w)}>
+                  <span>{label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="field">
+          <label>시간 (선택)</label>
+          <input type="time" value={qTime} onChange={(e) => setQTime(e.target.value)} />
+        </div>
+
+        <div className="field">
+          <label>메모 (선택)</label>
+          <input type="text" maxLength={100} value={qMemo} onChange={(e) => setQMemo(e.target.value)} />
+        </div>
+
+        <div className="notice-actions">
+          <span className={`quick-add-status${quickStatus.error ? ' error' : ''}`}>{quickStatus.text}</span>
+          <button className="btn btn-primary" onClick={quickAdd}>추가</button>
+        </div>
+
         {data.recurring.length > 0 && (
           <div>
             <div className="recurring-title">🔁 반복 일정</div>
             {data.recurring.map((r) => {
               const mem = memberById(data, r.memberId);
-              const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
-              const days = [...r.weekdays].sort().map((w) => dayNames[w]).join(',');
+              const days = [...r.weekdays].sort().map((w) => DAY_NAMES[w]).join(',');
               return (
                 <div className="recurring-row" key={r.id}>
                   <MemberBadge data={data} memberId={r.memberId} size={18} />
@@ -510,6 +594,12 @@ export default function Home() {
               <label>시간 (선택)</label>
               <input type="time" value={fTime} onChange={(e) => setFTime(e.target.value)} />
             </div>
+            {!editingId && (
+              <div className="field">
+                <label>종료일 (선택 — 여러 날짜에 걸친 일정이면)</label>
+                <input type="date" min={activeDs || undefined} value={fEndDate} onChange={(e) => setFEndDate(e.target.value)} />
+              </div>
+            )}
             <div className="field">
               <label>누구 일정인가요?</label>
               <div className="member-pick">
