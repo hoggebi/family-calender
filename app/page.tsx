@@ -32,6 +32,82 @@ function MemberBadge({ data, memberId, isNotice, isRecurring, size = 18 }: { dat
 
 const DAY_NAMES = ['일', '월', '화', '수', '목', '금', '토'];
 
+function formatRange(start: string, end: string) {
+  const [, sm, sd] = start.split('-').map(Number);
+  const [, em, ed] = end.split('-').map(Number);
+  if (sm === em) return `${sm}/${sd}~${ed}`;
+  return `${sm}/${sd}~${em}/${ed}`;
+}
+
+function MonthHighlights({
+  data,
+  y,
+  m,
+  onOpenRange,
+  onOpenRecurring,
+}: {
+  data: CalendarData;
+  y: number;
+  m: number;
+  onOpenRange: (ds: string) => void;
+  onOpenRecurring: (rule: CalendarData['recurring'][number]) => void;
+}) {
+  const monthStart = dateStr(y, m, 1);
+  const monthEnd = dateStr(y, m, new Date(y, m + 1, 0).getDate());
+
+  const groups = new Map<string, { dates: string[]; title: string; memberId: string | null }>();
+  data.events
+    .filter((e) => e.groupId)
+    .forEach((e) => {
+      const g = groups.get(e.groupId as string);
+      if (g) g.dates.push(e.date);
+      else groups.set(e.groupId as string, { dates: [e.date], title: e.title, memberId: e.memberId });
+    });
+  const ranges = [...groups.values()]
+    .map((g) => {
+      const dates = [...g.dates].sort();
+      return { ...g, start: dates[0], end: dates[dates.length - 1] };
+    })
+    .filter((r) => r.start <= monthEnd && r.end >= monthStart)
+    .sort((a, b) => a.start.localeCompare(b.start));
+
+  if (ranges.length === 0 && data.recurring.length === 0) return null;
+
+  return (
+    <div className="highlights">
+      {ranges.map((r) => {
+        const mem = memberById(data, r.memberId);
+        return (
+          <div
+            className="highlight-bar"
+            key={r.start + r.title}
+            style={{ background: mem ? mem.color : '#999' }}
+            onClick={() => onOpenRange(r.start)}
+          >
+            <span className="hi-badge">{mem?.icon ?? '📌'}</span>
+            <span className="hi-text">{formatRange(r.start, r.end)} {r.title}</span>
+          </div>
+        );
+      })}
+      {data.recurring.map((r) => {
+        const mem = memberById(data, r.memberId);
+        const days = [...r.weekdays].sort().map((w) => DAY_NAMES[w]).join(',');
+        return (
+          <div
+            className="highlight-bar"
+            key={r.id}
+            style={{ background: mem ? mem.color : '#999' }}
+            onClick={() => onOpenRecurring(r)}
+          >
+            <span className="hi-badge">{mem?.icon ?? '🔁'}</span>
+            <span className="hi-text">🔁 매주 {days} {r.title}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function Home() {
   const [data, setData] = useState<CalendarData>(EMPTY_DATA);
   const [loading, setLoading] = useState(true);
@@ -77,6 +153,7 @@ export default function Home() {
       try {
         const res = await fetch('/api/calendar');
         const json = (await res.json()) as CalendarData;
+        if (!res.ok) throw new Error('load failed');
         setData({
           members: json.members?.length ? json.members : EMPTY_DATA.members,
           events: json.events || [],
@@ -382,6 +459,24 @@ export default function Home() {
         <button className="today-btn" onClick={() => { const d = new Date(); d.setDate(1); setCur(d); }}>오늘</button>
       </div>
 
+      <MonthHighlights
+        data={data}
+        y={y}
+        m={m}
+        onOpenRange={(ds) => openDay(ds)}
+        onOpenRecurring={(rule) => {
+          const dim = new Date(y, m + 1, 0).getDate();
+          let ds = dateStr(y, m, 1);
+          for (let d = 1; d <= dim; d++) {
+            if (rule.weekdays.includes(new Date(y, m, d).getDay())) {
+              ds = dateStr(y, m, d);
+              break;
+            }
+          }
+          openDay(ds, rule.id);
+        }}
+      />
+
       <div className="weekdays">
         <div style={{ color: 'var(--sun)' }}>일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div style={{ color: 'var(--sat)' }}>토</div>
       </div>
@@ -389,10 +484,8 @@ export default function Home() {
       <div className="grid">
         {weeks.map((week, wi) => {
           const segments: Record<string, { minCol: number; maxCol: number; title: string; color: string; startDs: string }> = {};
-          let weekHasHoliday = false;
           week.forEach((cell, col) => {
             if (!cell.ds) return;
-            if (HOLIDAYS[cell.ds]) weekHasHoliday = true;
             data.events.filter((e) => e.date === cell.ds && e.groupId).forEach((ev) => {
               const mem = memberById(data, ev.memberId);
               if (!segments[ev.groupId as string]) {
@@ -403,8 +496,8 @@ export default function Home() {
             });
           });
           const bars = Object.values(segments);
-          const spacerHeight = bars.length > 0 ? bars.length * 15 : 0;
-          const overlayTop = 15 + (weekHasHoliday ? 10 : 0);
+          const spacerHeight = bars.length > 0 ? bars.length * 16 : 0;
+          const overlayTop = 33;
 
           return (
             <div className="week-wrap" key={wi}>
@@ -427,23 +520,24 @@ export default function Home() {
 
                   return (
                     <div className={cls} key={ci} onClick={() => openDay(ds)}>
-                      <div className="date-num">{cell.day}</div>
+                      <div className="cell-head">
+                        <div className="date-num">{cell.day}</div>
+                        {holidayName && <div className="holiday-label">{holidayName}</div>}
+                      </div>
+                      {spacerHeight > 0 && <div style={{ height: spacerHeight }} />}
                       {recurringEvents.map((ev) => {
                         const mem = memberById(data, ev.memberId);
                         return (
                           <div
-                            className="recur-line"
+                            className="mini-bar"
                             key={ev.id}
-                            style={{ color: mem ? mem.color : '#777' }}
+                            style={{ background: mem ? mem.color : '#999' }}
                             onClick={(e2) => { e2.stopPropagation(); openDay(ds, ev.id); }}
                           >
-                            <span className="recur-icon" aria-hidden>🔁</span>
-                            <span className="recur-title">{ev.title}</span>
+                            {ev.title}
                           </div>
                         );
                       })}
-                      {holidayName && <div className="holiday-label">{holidayName}</div>}
-                      {spacerHeight > 0 && <div style={{ height: spacerHeight }} />}
                       {shown.map((ev) => {
                         const mem = memberById(data, ev.memberId);
                         const bg = ev.isNotice ? '#111111' : mem ? mem.color : '#999';
@@ -473,7 +567,7 @@ export default function Home() {
                       style={{
                         left: `calc(${(bar.minCol * 100) / 7}% + 2px)`,
                         width: `calc(${((bar.maxCol - bar.minCol + 1) * 100) / 7}% - 4px)`,
-                        top: idx * 15,
+                        top: idx * 16,
                         background: bar.color,
                       }}
                       onClick={() => openDay(bar.startDs)}
