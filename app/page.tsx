@@ -108,8 +108,153 @@ function MonthHighlights({
   );
 }
 
+type ListEntry = {
+  sortKey: string;
+  date: string;
+  endDate?: string;
+  title: string;
+  time: string;
+  memberId: string | null;
+  isNotice?: boolean;
+  memo: string;
+  evId: string;
+};
+
+function buildListEntries(data: CalendarData): ListEntry[] {
+  const groupsSeen = new Set<string>();
+  const entries: ListEntry[] = [];
+  data.events.forEach((e) => {
+    if (e.groupId) {
+      if (groupsSeen.has(e.groupId)) return;
+      groupsSeen.add(e.groupId);
+      const groupDates = data.events.filter((x) => x.groupId === e.groupId).map((x) => x.date).sort();
+      entries.push({
+        sortKey: groupDates[0],
+        date: groupDates[0],
+        endDate: groupDates[groupDates.length - 1],
+        title: e.title,
+        time: e.time,
+        memberId: e.memberId,
+        memo: e.memo,
+        evId: e.id,
+      });
+    } else {
+      entries.push({ sortKey: e.date, date: e.date, title: e.title, time: e.time, memberId: e.memberId, isNotice: e.isNotice, memo: e.memo, evId: e.id });
+    }
+  });
+  return entries.sort((a, b) => a.sortKey.localeCompare(b.sortKey) || (a.time || '99').localeCompare(b.time || '99'));
+}
+
+function ListView({
+  data,
+  onGoToEntry,
+  onEditRecurring,
+}: {
+  data: CalendarData;
+  onGoToEntry: (ds: string, evId: string) => void;
+  onEditRecurring: (rule: CalendarData['recurring'][number]) => void;
+}) {
+  const [query, setQuery] = useState('');
+  const q = query.trim().toLowerCase();
+
+  const recList = data.recurring
+    .filter((r) => {
+      if (!q) return true;
+      const mem = memberById(data, r.memberId);
+      const days = [...r.weekdays].sort().map((w) => DAY_NAMES[w]).join(',');
+      const text = `${r.title} ${mem?.name ?? ''} 매주 ${days} ${r.time} ${r.memo}`.toLowerCase();
+      return text.includes(q);
+    })
+    .sort((a, b) => (a.time || '99').localeCompare(b.time || '99'));
+
+  const entries = buildListEntries(data).filter((en) => {
+    if (!q) return true;
+    const mem = memberById(data, en.memberId);
+    const [, em, ed] = en.date.split('-').map(Number);
+    const dow = DAY_NAMES[new Date(en.date + 'T00:00:00').getDay()];
+    const dateForms = [en.date, `${em}/${ed}`, `${em}월 ${ed}일`, `${ed}일`, `${dow}요일`];
+    if (en.endDate) {
+      const [, eem, eed] = en.endDate.split('-').map(Number);
+      dateForms.push(en.endDate, `${eem}/${eed}`, `${eem}월 ${eed}일`);
+    }
+    const text = `${en.title} ${mem?.name ?? ''} ${en.time} ${en.memo} ${dateForms.join(' ')}`.toLowerCase();
+    return text.includes(q);
+  });
+
+  const groups: { key: string; label: string; rows: ListEntry[] }[] = [];
+  entries.forEach((en) => {
+    const [y, m] = en.date.split('-');
+    const key = `${y}-${m}`;
+    let g = groups[groups.length - 1];
+    if (!g || g.key !== key) {
+      g = { key, label: `${Number(y)}년 ${Number(m)}월`, rows: [] };
+      groups.push(g);
+    }
+    g.rows.push(en);
+  });
+
+  return (
+    <div className="tab-page">
+      <input
+        type="text"
+        className="list-search-input"
+        placeholder="🔍 날짜나 키워드로 검색 (예: 8/25, 수영, 호엄마)"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+      />
+
+      {recList.length === 0 && entries.length === 0 ? (
+        <div className="month-list-empty">{q ? '검색 결과가 없어요.' : '등록된 일정이 없어요.'}</div>
+      ) : (
+        <>
+          {recList.length > 0 && (
+            <div className="recurring-list-section">
+              <div className="month-list-title">🔁 반복 일정</div>
+              {recList.map((r) => {
+                const days = [...r.weekdays].sort().map((w) => DAY_NAMES[w]).join(',');
+                return (
+                  <div className="month-list-row" key={r.id} onClick={() => onEditRecurring(r)}>
+                    <MemberBadge data={data} memberId={r.memberId} size={20} />
+                    <span className="month-list-txt">매주 {days} {r.title}</span>
+                    <span className="month-list-time">{r.time}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {groups.map((g) => (
+            <div className="month-list-group" key={g.key}>
+              <div className="month-list-title">{g.label}</div>
+              {g.rows.map((en) => {
+                const d = Number(en.date.split('-')[2]);
+                const dow = DAY_NAMES[new Date(en.date + 'T00:00:00').getDay()];
+                return (
+                  <div className="month-list-row" key={en.evId} onClick={() => onGoToEntry(en.date, en.evId)}>
+                    <span className="month-list-date">
+                      {en.endDate ? (
+                        <><b>{d}</b>~{Number(en.endDate.split('-')[2])}일</>
+                      ) : (
+                        <><b>{d}</b>일({dow})</>
+                      )}
+                    </span>
+                    <MemberBadge data={data} memberId={en.memberId} isNotice={en.isNotice} size={18} />
+                    <span className="month-list-txt">{en.isNotice ? '📌 ' : ''}{en.title}</span>
+                    <span className="month-list-time">{en.time}</span>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function Home() {
   const [data, setData] = useState<CalendarData>(EMPTY_DATA);
+  const [tab, setTab] = useState<'calendar' | 'list'>('calendar');
   const [loading, setLoading] = useState(true);
   const [banner, setBanner] = useState<{ text: string; error?: boolean }>({ text: '불러오는 중…' });
 
@@ -209,6 +354,26 @@ export default function Home() {
     }
     clearForm();
     setDayOpen(true);
+  }
+
+  function goToEntryAndEdit(ds: string, evId: string) {
+    const [ey, em] = ds.split('-').map(Number);
+    setCur(new Date(ey, em - 1, 1));
+    setTab('calendar');
+    openDay(ds, evId);
+  }
+
+  function openRecurringFromList(rule: CalendarData['recurring'][number]) {
+    const start = new Date();
+    for (let i = 0; i < 60; i++) {
+      const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
+      if (rule.weekdays.includes(d.getDay())) {
+        setCur(new Date(d.getFullYear(), d.getMonth(), 1));
+        setTab('calendar');
+        openDay(dateStr(d.getFullYear(), d.getMonth(), d.getDate()), rule.id);
+        return;
+      }
+    }
   }
 
   function clearForm() {
@@ -413,6 +578,26 @@ export default function Home() {
 
       <div className={`status-banner${banner.error ? ' error' : ''}`}>{banner.text}</div>
 
+      <div className="family-strip">
+        {data.members.map((mem) => (
+          <div className="chip" key={mem.id}>
+            <MemberBadge data={data} memberId={mem.id} size={26} />
+            <span>{mem.name}</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="tab-row">
+        <button className={`tab-btn${tab === 'calendar' ? ' active' : ''}`} onClick={() => setTab('calendar')}>캘린더</button>
+        <button className={`tab-btn${tab === 'list' ? ' active' : ''}`} onClick={() => setTab('list')}>일정 목록</button>
+      </div>
+
+      {tab === 'list' && (
+        <ListView data={data} onGoToEntry={goToEntryAndEdit} onEditRecurring={openRecurringFromList} />
+      )}
+
+      {tab === 'calendar' && (
+      <div className="tab-page">
       <div className="notice-box">
         <div className="notice-label">📌 {m + 1}월 주요 공지사항</div>
         <div>
@@ -441,15 +626,6 @@ export default function Home() {
           <span className={`notice-status${noticeStatus.error ? ' error' : ''}`}>{noticeStatus.text}</span>
           <button className="btn btn-primary" onClick={addNotice}>추가</button>
         </div>
-      </div>
-
-      <div className="family-strip">
-        {data.members.map((mem) => (
-          <div className="chip" key={mem.id}>
-            <MemberBadge data={data} memberId={mem.id} size={26} />
-            <span>{mem.name}</span>
-          </div>
-        ))}
       </div>
 
       <div className="nav-row">
@@ -665,6 +841,8 @@ export default function Home() {
       <div className="footer-row">
         <button className="reset-link" onClick={resetAll}>전체 데이터 초기화</button>
       </div>
+      </div>
+      )}
 
       {dayOpen && activeDs && (
         <div className="overlay" onClick={(e) => { if (e.target === e.currentTarget) setDayOpen(false); }}>
