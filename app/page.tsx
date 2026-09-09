@@ -301,6 +301,12 @@ function ListView({
 
 export default function Home() {
   const [data, setData] = useState<CalendarData>(EMPTY_DATA);
+  // 서버에서 캐시된 오래된 HTML로 첫 렌더가 됐을 때도 오늘 날짜가 항상 최신으로 보이도록,
+  // 마운트 후 클라이언트 시계로 한 번 더 갱신
+  const [today, setToday] = useState(() => todayStr());
+  useEffect(() => {
+    setToday(todayStr());
+  }, []);
   const [tab, setTab] = useState<'calendar' | 'list'>('calendar');
   const [loading, setLoading] = useState(true);
   const [banner, setBanner] = useState<{ text: string; error?: boolean }>({ text: '불러오는 중…' });
@@ -414,7 +420,6 @@ export default function Home() {
   const m = cur.getMonth();
   const mKey = makeMonthKey(y, m);
   const weeks = useMemo(() => buildWeeks(y, m), [y, m]);
-  const today = todayStr();
 
   function openDay(ds: string, focusId?: string) {
     setActiveDs(ds);
