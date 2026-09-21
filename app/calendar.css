@@ -128,7 +128,7 @@ header { text-align: center; margin-bottom: 6px; }
   min-width: 0; overflow: hidden;
 }
 .cell.empty { background: var(--paper-edge); border: none; box-shadow: none; cursor: default; }
-.cell.today { outline: 2.5px solid var(--moss-dark); outline-offset: -2.5px; z-index: 2; background: #fff3d6; }
+.cell.today { background: #fff3d6; }
 .cell-head { height: 28px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 0; width: 100%; margin-bottom: 1px; }
 .date-num { font-size: 12px; font-weight: 500; color: var(--ink); text-align: center; width: 100%; line-height: 1.25; }
 .cell.today .date-num {
