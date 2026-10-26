@@ -303,9 +303,17 @@ export default function Home() {
   const [data, setData] = useState<CalendarData>(EMPTY_DATA);
   // 서버에서 캐시된 오래된 HTML로 첫 렌더가 됐을 때도 오늘 날짜가 항상 최신으로 보이도록,
   // 마운트 후 클라이언트 시계로 한 번 더 갱신
-  const [today, setToday] = useState(() => todayStr());
+  // 초기값을 비워 두어야 서버(UTC)와 브라우저의 날짜가 달라도 hydration 불일치로 하이라이트가 굳지 않음
+  const [today, setToday] = useState('');
   useEffect(() => {
-    setToday(todayStr());
+    const refresh = () => setToday(todayStr());
+    refresh();
+    document.addEventListener('visibilitychange', refresh);
+    window.addEventListener('focus', refresh);
+    return () => {
+      document.removeEventListener('visibilitychange', refresh);
+      window.removeEventListener('focus', refresh);
+    };
   }, []);
   const [tab, setTab] = useState<'calendar' | 'list'>('calendar');
   const [loading, setLoading] = useState(true);
